@@ -4,6 +4,25 @@ import path from 'path';
 
 const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
 
+// Add the missing helper functions
+const loadEconomy = async () => {
+  try {
+    const data = await fs.readFile(ECONOMY_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    return {};
+  }
+};
+
+const saveEconomy = async (data) => {
+  try {
+    await fs.mkdir(path.dirname(ECONOMY_FILE), { recursive: true });
+    await fs.writeFile(ECONOMY_FILE, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error('Error saving economy data:', error);
+  }
+};
+
 const command = {
   data: new SlashCommandBuilder()
     .setName('daily')
