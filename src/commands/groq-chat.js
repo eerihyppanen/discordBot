@@ -15,6 +15,12 @@ const command = {
     
     await interaction.deferReply();
     
+    // Check if API key is configured
+    if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here') {
+      await interaction.editReply('❌ Groq API key not configured. Please contact the bot administrator.');
+      return;
+    }
+    
     try {
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',

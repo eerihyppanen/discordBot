@@ -15,6 +15,12 @@ const command = {
     
     await interaction.deferReply();
     
+    // Check if API key is configured
+    if (!process.env.FACEIT_API_KEY || process.env.FACEIT_API_KEY === 'your_faceit_api_key_here') {
+      await interaction.editReply('❌ FACEIT API key not configured. Please contact the bot administrator.');
+      return;
+    }
+    
     try {
       // Get player data from FACEIT API
       const playerResponse = await fetch(`https://open.faceit.com/data/v4/players?nickname=${username}`, {

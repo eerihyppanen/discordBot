@@ -40,6 +40,12 @@ const command = {
     
     await interaction.deferReply();
     
+    // Check if API key is configured
+    if (!process.env.PUBG_API_KEY || process.env.PUBG_API_KEY === 'your_pubg_api_key_here') {
+      await interaction.editReply('❌ PUBG API key not configured. Please contact the bot administrator.');
+      return;
+    }
+    
     try {
       // Use correct regional endpoint
       const playerResponse = await fetch(`https://api.pubg.com/shards/${region}/players?filter[playerNames]=${username}`, {
