@@ -73,7 +73,10 @@ const showGeneralHelp = async (interaction) => {
         name: '💰 Economy System',
         value: [
           '`/balance [user]` - Check your balance',
-          '`/daily` - Claim your daily reward'
+          '`/daily` - Claim your daily reward',
+          '`/gamble coinflip <amount> <heads/tails>` - Double or nothing!',
+          '`/gamble slots <amount>` - Try the slot machine',
+          '`/gamble dice <amount> <high/low>` - Dice betting game'
         ].join('\n'),
         inline: false
       },
@@ -201,6 +204,13 @@ const getCommandDetails = (commandName) => {
       parameters: 'No parameters required',
       examples: '/daily',
       notes: 'Can only be claimed once every 24 hours'
+    },
+    'gamble': {
+      description: 'Gambling games with your coins',
+      usage: '/gamble <game> <amount> [choice]',
+      parameters: '`coinflip` - Double or nothing coin flip\n`slots` - Slot machine with multipliers\n`dice` - High/low dice betting',
+      examples: '/gamble coinflip 50 heads\n/gamble slots 100\n/gamble dice 200 high',
+      notes: '🎰 Coinflip: 2x payout | Slots: up to 10x | Dice: 1.8x payout'
     },
     'remind': {
       description: 'Set a reminder for yourself',
