@@ -16,20 +16,33 @@ const command = {
         .addChoices(
           { name: 'Steam (PC)', value: 'steam' },
           { name: 'Xbox', value: 'xbox' },
-          { name: 'PlayStation', value: 'psn' },
-          { name: 'Stadia', value: 'stadia' }
+          { name: 'PlayStation', value: 'psn' }
+        )
+    )
+    .addStringOption(option =>
+      option.setName('region')
+        .setDescription('Server region')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Europe', value: 'pc-eu' },
+          { name: 'North America', value: 'pc-na' },
+          { name: 'Asia', value: 'pc-as' },
+          { name: 'Oceania', value: 'pc-oc' },
+          { name: 'South America', value: 'pc-sa' },
+          { name: 'Console (Global)', value: 'console' }
         )
     ),
   
   async execute(interaction) {
     const username = interaction.options.getString('username');
     const platform = interaction.options.getString('platform');
+    const region = interaction.options.getString('region') || 'pc-eu'; // Default to EU
     
     await interaction.deferReply();
     
     try {
-      // Get player data from PUBG API
-      const playerResponse = await fetch(`https://api.pubg.com/shards/pc-na/players?filter[playerNames]=${username}`, {
+      // Use correct regional endpoint
+      const playerResponse = await fetch(`https://api.pubg.com/shards/${region}/players?filter[playerNames]=${username}`, {
         headers: {
           'Authorization': `Bearer ${process.env.PUBG_API_KEY}`,
           'Accept': 'application/vnd.api+json'
@@ -55,7 +68,7 @@ const command = {
       let matchStats = null;
       
       if (matchId) {
-        const matchResponse = await fetch(`https://api.pubg.com/shards/pc-na/matches/${matchId}`, {
+        const matchResponse = await fetch(`https://api.pubg.com/shards/${region}/matches/${matchId}`, {
           headers: {
             'Authorization': `Bearer ${process.env.PUBG_API_KEY}`,
             'Accept': 'application/vnd.api+json'
