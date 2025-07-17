@@ -3,6 +3,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "url";
 
+// Debug environment variables
+console.log('🔍 Environment Check:');
+console.log('TOKEN:', process.env.TOKEN ? '✅ Set' : '❌ Missing');
+console.log('CLIENT_ID:', process.env.CLIENT_ID ? '✅ Set' : '❌ Missing');
+console.log('GUILD_ID:', process.env.GUILD_ID ? '✅ Set' : '❌ Missing');
+console.log('FACEIT_API_KEY:', process.env.FACEIT_API_KEY ? '✅ Set' : '❌ Missing');
+console.log('PUBG_API_KEY:', process.env.PUBG_API_KEY ? '✅ Set' : '❌ Missing');
+console.log('GROQ_API_KEY:', process.env.GROQ_API_KEY ? '✅ Set' : '❌ Missing');
+
 // Create a new client instance
 const client = new Client({
   intents: [
@@ -86,4 +95,13 @@ client.on('interactionCreate', async interaction => {
 });
 
 // Log in to Discord with your client's token
-client.login(process.env.TOKEN);
+console.log('🚀 Attempting to login to Discord...');
+if (!process.env.TOKEN) {
+  console.error('❌ No Discord TOKEN found in environment variables!');
+  process.exit(1);
+}
+
+client.login(process.env.TOKEN).catch(error => {
+  console.error('❌ Failed to login to Discord:', error);
+  process.exit(1);
+});
