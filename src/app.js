@@ -94,6 +94,30 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
+// Global error handlers
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit - keep the bot running
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Don't exit - keep the bot running
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('🛑 Received SIGINT, shutting down gracefully...');
+  client.destroy();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('🛑 Received SIGTERM, shutting down gracefully...');
+  client.destroy();
+  process.exit(0);
+});
+
 // Log in to Discord with your client's token
 console.log('🚀 Attempting to login to Discord...');
 if (!process.env.TOKEN) {
@@ -103,5 +127,16 @@ if (!process.env.TOKEN) {
 
 client.login(process.env.TOKEN).catch(error => {
   console.error('❌ Failed to login to Discord:', error);
-  process.exit(1);
+  console.log('🔄 Retrying login in 5 seconds...');
+  setTimeout(() => {
+    client.login(process.env.TOKEN).catch(retryError => {
+      console.error('❌ Retry failed:', retryError);
+      process.exit(1);
+    });
+  }, 5000);
 });
+
+// Keep the process alive
+setInterval(() => {
+  console.log(`💓 Bot heartbeat - ${new Date().toISOString()}`);
+}, 300000); // Every 5 minutes

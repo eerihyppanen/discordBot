@@ -10,12 +10,15 @@ const getXPForLevel = (level) => level * level * 100;
 const loadUserData = async () => {
   try {
     console.log(`📂 Loading user data from: ${DATA_FILE}`);
+    console.log(`📁 Working directory: ${process.cwd()}`);
+    console.log(`🗂️ Data directory exists: ${await fs.access(path.dirname(DATA_FILE)).then(() => true).catch(() => false)}`);
     const data = await fs.readFile(DATA_FILE, 'utf8');
     const parsed = JSON.parse(data);
     console.log(`✅ Loaded data for ${Object.keys(parsed).length} users`);
     return parsed;
   } catch (error) {
     console.log(`⚠️ No existing user data found, creating new file: ${error.message}`);
+    console.log(`📁 Working directory: ${process.cwd()}`);
     return {};
   }
 };
@@ -24,9 +27,15 @@ const loadUserData = async () => {
 const saveUserData = async (data) => {
   try {
     console.log(`💾 Saving user data to: ${DATA_FILE}`);
+    console.log(`📁 Working directory: ${process.cwd()}`);
     await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
+    console.log(`📁 Created directory: ${path.dirname(DATA_FILE)}`);
     await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
     console.log(`✅ Saved data for ${Object.keys(data).length} users`);
+    
+    // Verify file was written
+    const fileExists = await fs.access(DATA_FILE).then(() => true).catch(() => false);
+    console.log(`🔍 File verification: ${fileExists ? 'EXISTS' : 'NOT FOUND'}`);
   } catch (error) {
     console.error('❌ Error saving user data:', error);
   }
