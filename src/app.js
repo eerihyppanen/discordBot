@@ -1,20 +1,51 @@
-import { Client, GatewayIntentBits, Partials, Collection } from "discord.js";
-import { loadEvents } from "./helpers";
-import path from "path";
+import { Client, GatewayIntentBits, Collection } from "discord.js";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "url";
 
-const TOKEN = process.env.TOKEN;
-
-const { Guilds, GuildMembers, GuildMessages, MessageContent } =
-  GatewayIntentBits;
-const { User, Message, GuildMember, ThreadMember } = Partials;
-
+// Create a new client instance
 const client = new Client({
-  intents: [Guilds, GuildMembers, GuildMessages, MessageContent],
-  partials: [User, Message, GuildMember, ThreadMember],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessageReactions,
+  ],
 });
 
-client.events = new Collection();
+// --- Command Loading ---
+client.commands = new Collection();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const commandsPath = path.join(__dirname, "commands");
+const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith(".js"));
 
-loadEvents(client, path.join(__dirname, "events"));
+for (const file of commandFiles) {
+  const filePath = path.join(commandsPath, file);
+  // Dynamically import each command file
+  const { default: command } = await import(filePath);
+  if ("data" in command && "execute" in command) {
+    client.commands.set(command.data.name, command);
+  } else {
+    console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+  }
+}
 
-client.login(TOKEN);
+// --- Event Loading ---
+const eventsPath = path.join(__dirname, "events");
+const eventFiles = fs.readdirSync(eventsPath).filter((file) => file.endsWith(".js"));
+
+for (const file of eventFiles) {
+  const filePath = path.join(eventsPath, file);
+  const { default: event } = await import(filePath);
+  if (event.once) {
+    client.once(event.name, (...args) => event.execute(...args));
+  } else {
+    client.on(event.name, (...args) => event.execute(...args));
+  }
+}
+
+// Log in to Discord with your client's token
+client.login(process.env.TOKEN);
