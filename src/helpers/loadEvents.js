@@ -2,14 +2,15 @@ import loadFiles from "./loadFiles";
 import ascii from "ascii-table";
 import path from "path";
 
-export default function loadEvents(client, dirName) {
+export default async function loadEvents(client, dirName) {
   client.events.clear();
 
   const files = loadFiles(dirName, ".js");
   const table = new ascii("Events").setHeading("Event", "Status");
 
   for (const file of files) {
-    const event = require(path.join(dirName, file)).default;
+    const eventModule = await import(path.join(dirName, file));
+    const event = eventModule.default;
 
     const execute = (...args) => event.execute(...args, client);
     client.events.set(event.name, execute);
