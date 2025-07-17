@@ -49,16 +49,14 @@ const showGeneralHelp = async (interaction) => {
       {
         name: '🎵 Music Commands',
         value: [
-          '`/play-simple <url>` - Play audio from YouTube URL',
-          '`/play <query>` - Play music from YouTube (search)',
+          '`/play-simple <url>` - Play audio from YouTube URL'
         ].join('\n'),
         inline: false
       },
       {
         name: '🤖 AI & Chat',
         value: [
-          '`/groq <message>` - Chat with AI (Groq - very fast)',
-          '`/chat <message>` - Chat with local AI (Ollama)'
+          '`/groq <message>` - Chat with AI (Groq - very fast)'
         ].join('\n'),
         inline: false
       },
@@ -75,33 +73,25 @@ const showGeneralHelp = async (interaction) => {
         name: '💰 Economy System',
         value: [
           '`/balance [user]` - Check your balance',
-          '`/daily` - Claim your daily reward',
-          '*More economy features coming soon!*'
+          '`/daily` - Claim your daily reward'
         ].join('\n'),
         inline: false
       },
       {
-        name: '⚠️ Moderation',
-        value: [
-          '`/kick <user> [reason]` - Kick a user from server',
-          '`/serverinfo` - Display server information'
-        ].join('\n'),
-        inline: false
-      },
-      {
-        name: '⏰ Utility',
+        name: '⏰ Utility & Fun',
         value: [
           '`/remind <time> <message>` - Set a reminder',
+          '`/8ball <question>` - Ask the magic 8-ball',
           '`/help [command]` - Show this help or command details'
         ].join('\n'),
         inline: false
       },
       {
-        name: '🎉 Fun & Events',
+        name: '🎉 Auto Features',
         value: [
           '*Auto welcome messages for new members*',
-          '*Level up celebrations*',
-          '*Automatic role assignments*'
+          '*Level up celebrations with role rewards*',
+          '*XP gained from chatting*'
         ].join('\n'),
         inline: false
       }
@@ -177,26 +167,12 @@ const getCommandDetails = (commandName) => {
       examples: '/play-simple https://youtube.com/watch?v=dQw4w9WgXcQ',
       notes: 'You must be in a voice channel to use this command'
     },
-    'play': {
-      description: 'Play music from YouTube with search functionality',
-      usage: '/play <query>',
-      parameters: '`query` - Song name or YouTube URL',
-      examples: '/play Imagine Dragons Believer\n/play https://youtube.com/watch?v=...',
-      notes: 'Advanced music player with queue support'
-    },
     'groq': {
       description: 'Chat with AI using Groq (very fast responses)',
       usage: '/groq <message>',
       parameters: '`message` - Your message to the AI',
       examples: '/groq What\'s the best PUBG strategy?\n/groq Write me a joke',
       notes: 'Powered by Groq API - super fast AI responses'
-    },
-    'chat': {
-      description: 'Chat with local AI using Ollama',
-      usage: '/chat <message>',
-      parameters: '`message` - Your message to the AI',
-      examples: '/chat Help me with coding\n/chat Tell me about PUBG',
-      notes: 'Requires Ollama to be running locally'
     },
     'level': {
       description: 'Check your level and XP progress',
@@ -225,20 +201,6 @@ const getCommandDetails = (commandName) => {
       parameters: 'No parameters required',
       examples: '/daily',
       notes: 'Can only be claimed once every 24 hours'
-    },
-    'kick': {
-      description: 'Kick a user from the server',
-      usage: '/kick <user> [reason]',
-      parameters: '`user` - User to kick\n`reason` - Reason for kick (optional)',
-      examples: '/kick @baduser Spamming\n/kick @user',
-      notes: 'Requires Kick Members permission'
-    },
-    'serverinfo': {
-      description: 'Display detailed server information',
-      usage: '/serverinfo',
-      parameters: 'No parameters required',
-      examples: '/serverinfo',
-      notes: 'Shows member count, creation date, and more'
     },
     'remind': {
       description: 'Set a reminder for yourself',
