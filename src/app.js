@@ -47,5 +47,43 @@ for (const file of eventFiles) {
   }
 }
 
+// Ready event
+client.once('ready', () => {
+  console.log(`✅ ${client.user.tag} is online!`);
+  console.log(`📝 Loaded ${client.commands.size} commands:`);
+  client.commands.forEach(command => {
+    console.log(`   - /${command.data.name}`);
+  });
+});
+
+// Handle slash command interactions
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  const command = interaction.client.commands.get(interaction.commandName);
+
+  if (!command) {
+    console.error(`No command matching ${interaction.commandName} was found.`);
+    return;
+  }
+
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(`Error executing ${interaction.commandName}:`, error);
+    
+    const errorMessage = {
+      content: 'There was an error while executing this command!',
+      ephemeral: true
+    };
+    
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(errorMessage);
+    } else {
+      await interaction.reply(errorMessage);
+    }
+  }
+});
+
 // Log in to Discord with your client's token
 client.login(process.env.TOKEN);
