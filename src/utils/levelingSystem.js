@@ -9,9 +9,13 @@ const getXPForLevel = (level) => level * level * 100;
 // Load user data from file
 const loadUserData = async () => {
   try {
+    console.log(`📂 Loading user data from: ${DATA_FILE}`);
     const data = await fs.readFile(DATA_FILE, 'utf8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    console.log(`✅ Loaded data for ${Object.keys(parsed).length} users`);
+    return parsed;
   } catch (error) {
+    console.log(`⚠️ No existing user data found, creating new file: ${error.message}`);
     return {};
   }
 };
@@ -19,10 +23,12 @@ const loadUserData = async () => {
 // Save user data to file
 const saveUserData = async (data) => {
   try {
+    console.log(`💾 Saving user data to: ${DATA_FILE}`);
     await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
     await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
+    console.log(`✅ Saved data for ${Object.keys(data).length} users`);
   } catch (error) {
-    console.error('Error saving user data:', error);
+    console.error('❌ Error saving user data:', error);
   }
 };
 

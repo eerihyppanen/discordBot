@@ -7,19 +7,25 @@ const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
 // Add the missing helper functions
 const loadEconomy = async () => {
   try {
+    console.log(`💰 Loading economy data from: ${ECONOMY_FILE}`);
     const data = await fs.readFile(ECONOMY_FILE, 'utf8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    console.log(`✅ Loaded economy data for ${Object.keys(parsed).length} users`);
+    return parsed;
   } catch (error) {
+    console.log(`⚠️ No existing economy data found, creating new file: ${error.message}`);
     return {};
   }
 };
 
 const saveEconomy = async (data) => {
   try {
+    console.log(`💾 Saving economy data to: ${ECONOMY_FILE}`);
     await fs.mkdir(path.dirname(ECONOMY_FILE), { recursive: true });
     await fs.writeFile(ECONOMY_FILE, JSON.stringify(data, null, 2));
+    console.log(`✅ Saved economy data for ${Object.keys(data).length} users`);
   } catch (error) {
-    console.error('Error saving economy data:', error);
+    console.error('❌ Error saving economy data:', error);
   }
 };
 
