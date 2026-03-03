@@ -47,13 +47,6 @@ const showGeneralHelp = async (interaction) => {
         inline: false
       },
       {
-        name: '🎵 Music Commands',
-        value: [
-          '`/play-simple <url>` - Play audio from YouTube URL'
-        ].join('\n'),
-        inline: false
-      },
-      {
         name: '🤖 AI & Chat',
         value: [
           '`/groq <message>` - Chat with AI (Groq - very fast)'
