@@ -2,11 +2,17 @@ import fs from 'fs/promises';
 import path from 'path';
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'userLevels.json');
+const SAVE_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+// In-memory cache to reduce SD card writes
+let userDataCache = {};
+let lastSaveTime = 0;
+let saveScheduled = false;
 
 // XP required for each level (exponential growth)
 const getXPForLevel = (level) => level * level * 100;
 
-// Load user data from file
+// Load user data from file (once at startup)
 const loadUserData = async () => {
   try {
     console.log(`📂 Loading user data from: ${DATA_FILE}`);
@@ -15,16 +21,18 @@ const loadUserData = async () => {
     const data = await fs.readFile(DATA_FILE, 'utf8');
     const parsed = JSON.parse(data);
     console.log(`✅ Loaded data for ${Object.keys(parsed).length} users`);
+    userDataCache = parsed;
     return parsed;
   } catch (error) {
     console.log(`⚠️ No existing user data found, creating new file: ${error.message}`);
     console.log(`📁 Working directory: ${process.cwd()}`);
+    userDataCache = {};
     return {};
   }
 };
 
-// Save user data to file
-const saveUserData = async (data) => {
+// Save user data to file (batched every 5 minutes to reduce SD card wear)
+const saveUserDataToDisk = async (data) => {
   try {
     console.log(`💾 Saving user data to: ${DATA_FILE}`);
     console.log(`📁 Working directory: ${process.cwd()}`);
@@ -32,6 +40,7 @@ const saveUserData = async (data) => {
     console.log(`📁 Created directory: ${path.dirname(DATA_FILE)}`);
     await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
     console.log(`✅ Saved data for ${Object.keys(data).length} users`);
+    lastSaveTime = Date.now();
     
     // Verify file was written
     const fileExists = await fs.access(DATA_FILE).then(() => true).catch(() => false);
@@ -41,47 +50,67 @@ const saveUserData = async (data) => {
   }
 };
 
-// Add XP to user and check for level up
-export const addXP = async (userId, xpGained = 15) => {
-  const userData = await loadUserData();
+// Schedule a save if one isn't already scheduled
+const scheduleSave = () => {
+  if (!saveScheduled) {
+    saveScheduled = true;
+    setTimeout(() => {
+      saveUserDataToDisk(userDataCache);
+      saveScheduled = false;
+    }, SAVE_INTERVAL);
+  }
+};
+
+// Initialize data on startup
+export const initializeData = async () => {
+  await loadUserData();
   
-  if (!userData[userId]) {
-    userData[userId] = { xp: 0, level: 1 };
+  // Save immediately on shutdown
+  process.on('SIGINT', async () => {
+    console.log('\n📍 Saving data before shutdown...');
+    await saveUserDataToDisk(userDataCache);
+    process.exit(0);
+  });
+};
+
+// Add XP to user and check for level up (updates memory immediately, saves to disk every 5 min)
+export const addXP = async (userId, xpGained = 15) => {
+  if (!userDataCache[userId]) {
+    userDataCache[userId] = { xp: 0, level: 1 };
   }
   
-  userData[userId].xp += xpGained;
-  const currentLevel = userData[userId].level;
+  userDataCache[userId].xp += xpGained;
+  const currentLevel = userDataCache[userId].level;
   const xpForNextLevel = getXPForLevel(currentLevel + 1);
   
   let leveledUp = false;
   
   // Check if user leveled up
-  if (userData[userId].xp >= xpForNextLevel) {
-    userData[userId].level += 1;
+  if (userDataCache[userId].xp >= xpForNextLevel) {
+    userDataCache[userId].level += 1;
     leveledUp = true;
   }
   
-  await saveUserData(userData);
+  // Schedule disk save (batched)
+  scheduleSave();
   
   return {
-    ...userData[userId],
+    ...userDataCache[userId],
     leveledUp,
-    xpForNextLevel: getXPForLevel(userData[userId].level + 1)
+    xpForNextLevel: getXPForLevel(userDataCache[userId].level + 1)
   };
 };
 
 // Get user level data
 export const getUserLevel = async (userId) => {
-  const userData = await loadUserData();
-  
-  if (!userData[userId]) {
-    userData[userId] = { xp: 0, level: 1 };
-    await saveUserData(userData);
+  if (!userDataCache[userId]) {
+    userDataCache[userId] = { xp: 0, level: 1 };
+    scheduleSave();
   }
   
   return {
-    ...userData[userId],
-    xpForNextLevel: getXPForLevel(userData[userId].level + 1)
+    ...userDataCache[userId],
+    xpForNextLevel: getXPForLevel(userDataCache[userId].level + 1)
   };
 };
 
