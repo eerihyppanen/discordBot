@@ -32,7 +32,21 @@ const showGeneralHelp = async (interaction) => {
         value: [
           '`/faceit <username>` - Check FACEIT CS2/CSGO stats',
           '`/pubg <username> <platform>` - Check PUBG player stats',
+          '`/pubg-wins <username> <platform>` - Track PUBG win statistics',
+          '`/pubg-wins-add <username> <platform> <wins> <matches>` - Manually add wins',
+          '`/pubg-leaderboard` - View top PUBG players by wins',
           '`/8ball <question>` - Ask the magic 8-ball a question'
+        ].join('\n'),
+        inline: false
+      },
+      {
+        name: '🎲 Colonist.io Tracker',
+        value: [
+          '`/colonist win` - Record a win (earn XP & coins!)',
+          '`/colonist loss` - Record a loss (resets streak)',
+          '`/colonist stats [user]` - View your statistics',
+          '`/colonist-leaderboard [type]` - View win/streak leaderboards',
+          '*Win streaks give bonus rewards every 3 wins!*'
         ].join('\n'),
         inline: false
       },

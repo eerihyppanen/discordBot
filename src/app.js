@@ -3,9 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "url";
 import { initializeData } from "./utils/levelingSystem.js";
+import { initializePubgWinsData } from "./utils/pubgWinsSystem.js";
+import { initializeColonistData } from "./utils/colonistSystem.js";
 
 // Initialize data (loads from disk, sets up graceful shutdown)
 await initializeData();
+await initializePubgWinsData();
+await initializeColonistData();
 
 // Debug environment variables
 console.log('🔍 Environment Check:');
