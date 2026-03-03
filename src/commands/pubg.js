@@ -1,5 +1,67 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 
+const PUBG_HEADERS = () => ({
+  'Authorization': `Bearer ${process.env.PUBG_API_KEY}`,
+  'Accept': 'application/vnd.api+json'
+});
+
+const getShardCandidates = (region, platform) => {
+  const pcShards = ['pc-eu', 'pc-na', 'pc-as', 'pc-oc', 'pc-sa', 'steam'];
+  const consoleShards = ['console', 'xbox', 'psn'];
+  const candidates = [region, platform];
+
+  if (platform === 'steam') {
+    candidates.push(...pcShards);
+  } else {
+    candidates.push(...consoleShards);
+  }
+
+  return [...new Set(candidates)];
+};
+
+const fetchPlayerFromShard = async (username, shard) => {
+  const response = await fetch(
+    `https://api.pubg.com/shards/${shard}/players?filter[playerNames]=${encodeURIComponent(username)}`,
+    { headers: PUBG_HEADERS() }
+  );
+
+  if (!response.ok) return null;
+  const json = await response.json();
+  if (!json.data || json.data.length === 0) return null;
+  return json.data[0];
+};
+
+const resolvePlayerWithMatches = async (username, region, platform) => {
+  const shardCandidates = getShardCandidates(region, platform);
+  let fallbackPlayer = null;
+  let fallbackShard = null;
+
+  for (const shard of shardCandidates) {
+    try {
+      const player = await fetchPlayerFromShard(username, shard);
+      if (!player) continue;
+
+      const matchCount = player.relationships?.matches?.data?.length || 0;
+      if (matchCount > 0) {
+        return { player, shard };
+      }
+
+      if (!fallbackPlayer) {
+        fallbackPlayer = player;
+        fallbackShard = shard;
+      }
+    } catch (error) {
+      console.error(`Error fetching player on shard ${shard}:`, error);
+    }
+  }
+
+  if (fallbackPlayer) {
+    return { player: fallbackPlayer, shard: fallbackShard };
+  }
+
+  return null;
+};
+
 const command = {
   data: new SlashCommandBuilder()
     .setName('pubg')
@@ -47,45 +109,33 @@ const command = {
     }
     
     try {
-      // Use correct regional endpoint
-      const playerResponse = await fetch(`https://api.pubg.com/shards/${region}/players?filter[playerNames]=${username}`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.PUBG_API_KEY}`,
-          'Accept': 'application/vnd.api+json'
-        }
-      });
-      
-      if (!playerResponse.ok) {
-        await interaction.editReply('Player not found or API error!');
-        return;
-      }
-      
-      const playerData = await playerResponse.json();
-      
-      if (!playerData.data || playerData.data.length === 0) {
+      const resolved = await resolvePlayerWithMatches(username, region, platform);
+
+      if (!resolved) {
         await interaction.editReply('Player not found!');
         return;
       }
-      
-      const player = playerData.data[0];
+
+      const { player, shard } = resolved;
       
       // Get recent match for additional stats
-      const matchId = player.relationships.matches.data[0]?.id;
+      const matchId = player.relationships?.matches?.data?.[0]?.id;
       let matchStats = null;
       
       if (matchId) {
-        const matchResponse = await fetch(`https://api.pubg.com/shards/${region}/matches/${matchId}`, {
-          headers: {
-            'Authorization': `Bearer ${process.env.PUBG_API_KEY}`,
-            'Accept': 'application/vnd.api+json'
-          }
+        const matchResponse = await fetch(`https://api.pubg.com/shards/${shard}/matches/${matchId}`, {
+          headers: PUBG_HEADERS()
         });
         
         if (matchResponse.ok) {
           const matchData = await matchResponse.json();
+          const playerNameLower = player.attributes.name.toLowerCase();
           const participant = matchData.included.find(item => 
-            item.type === 'participant' && 
-            item.attributes.stats.playerId === player.id
+            item.type === 'participant' &&
+            (
+              item.attributes?.stats?.playerId === player.id ||
+              item.attributes?.stats?.name?.toLowerCase() === playerNameLower
+            )
           );
           if (participant) {
             matchStats = participant.attributes.stats;
@@ -99,7 +149,7 @@ const command = {
         .addFields(
           { name: 'Player ID', value: `${player.attributes.name}`, inline: true },
           { name: 'Platform', value: `${platform.toUpperCase()}`, inline: true },
-          { name: 'Status', value: '✅ Active', inline: true }
+          { name: 'Shard', value: `${shard.toUpperCase()}`, inline: true }
         );
       
       if (matchStats) {
