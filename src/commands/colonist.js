@@ -65,7 +65,7 @@ const command = {
     ),
   
   async execute(interaction) {
-    const subcommand = interaction.subcommand();
+    const subcommand = interaction.options.getSubcommand();
     
     if (subcommand === 'win') {
       await interaction.deferReply();
