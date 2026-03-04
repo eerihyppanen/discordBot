@@ -77,6 +77,10 @@ const command = {
         // Add win and get rewards
         const result = await addWin(userId, username);
         
+        if (!result || typeof result !== 'object') {
+          throw new Error('Failed to record win: Invalid result from addWin');
+        }
+        
         // Give XP reward
         const xpResult = await addXP(userId, result.xpReward);
         
@@ -84,6 +88,10 @@ const command = {
         const newBalance = await addCoins(userId, result.coinReward);
         
         // Build response
+        const winRate = result.totalGames > 0 
+          ? ((result.wins / result.totalGames) * 100).toFixed(1) 
+          : '0.0';
+        
         const embed = new EmbedBuilder()
           .setColor('#FFD700')
           .setTitle('🎉 Colonist.io Victory!')
@@ -92,7 +100,7 @@ const command = {
             { name: '📊 Game Stats', value: '━━━━━━━━━━━━━━━━', inline: false },
             { name: '🏆 Total Wins', value: `${result.wins}`, inline: true },
             { name: '🎮 Total Games', value: `${result.totalGames}`, inline: true },
-            { name: '📈 Win Rate', value: `${((result.wins / result.totalGames) * 100).toFixed(1)}%`, inline: true },
+            { name: '📈 Win Rate', value: `${winRate}%`, inline: true },
             { name: '🔥 Current Streak', value: `${result.currentStreak} ${result.currentStreak >= 3 ? '🔥' : ''}`, inline: true },
             { name: '⭐ Longest Streak', value: `${result.longestStreak}`, inline: true },
             { name: '\u200B', value: '\u200B', inline: true },
@@ -127,6 +135,14 @@ const command = {
         // Add loss
         const result = await addLoss(userId, username);
         
+        if (!result || typeof result !== 'object') {
+          throw new Error('Failed to record loss: Invalid result from addLoss');
+        }
+        
+        const winRate = result.totalGames > 0 
+          ? ((result.wins / result.totalGames) * 100).toFixed(1) 
+          : '0.0';
+        
         const embed = new EmbedBuilder()
           .setColor('#FF6B6B')
           .setTitle('💔 Colonist.io Defeat')
@@ -135,7 +151,7 @@ const command = {
             { name: '📊 Game Stats', value: '━━━━━━━━━━━━━━━━', inline: false },
             { name: '🏆 Total Wins', value: `${result.wins}`, inline: true },
             { name: '🎮 Total Games', value: `${result.totalGames}`, inline: true },
-            { name: '📈 Win Rate', value: `${((result.wins / result.totalGames) * 100).toFixed(1)}%`, inline: true },
+            { name: '📈 Win Rate', value: `${winRate}%`, inline: true },
             { name: '🔥 Streak Reset', value: result.longestStreak > 0 ? `Best: ${result.longestStreak}` : 'No previous streak', inline: false }
           )
           .setFooter({ text: 'Your win streak has been reset. Start a new one!' })
