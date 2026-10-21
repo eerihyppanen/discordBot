@@ -18,10 +18,20 @@ export const addXP = (userId, xpGained = 15, { beforeCommit } = {}) => store.upd
   return result;
 });
 
-export const getUserLevel = (userId) => store.update((users) => {
-  users[userId] ??= { xp: 0, level: 1 };
-  return { ...users[userId], xpForNextLevel: getXPForLevel(users[userId].level + 1) };
-});
+export const getUserLevel = async (userId) => {
+  const user = (await store.read())[userId];
+  if (user) return { ...user, xpForNextLevel: getXPForLevel(user.level + 1) };
+
+  // Initialize a new user once; viewing an existing user must not schedule a save.
+  return store.update((users) => {
+    users[userId] ??= { xp: 0, level: 1 };
+    return { ...users[userId], xpForNextLevel: getXPForLevel(users[userId].level + 1) };
+  });
+};
+
+export const getLevelLeaderboard = async (limit = 10) => Object.entries(await store.read())
+  .sort(([, a], [, b]) => b.level - a.level || b.xp - a.xp)
+  .slice(0, limit);
 
 // Level-based role configuration
 export const LEVEL_ROLES = {

@@ -105,7 +105,9 @@ folder before deploying. Run **one bot process per data directory**: the write q
 within a process, so replicas must not share these JSON files.
 
 XP, PUBG wins, and Colonist statistics still batch writes for up to five minutes to reduce
-SD-card writes. Both `SIGINT` and `SIGTERM` stop accepting new work, flush current state,
+SD-card writes. XP leaderboards and level checks for existing users read the shared in-memory
+XP data, including unsaved changes, without extra disk reads or scheduled writes.
+Both `SIGINT` and `SIGTERM` stop accepting new work, flush current state,
 finish in-flight commands, flush again, and then disconnect Discord. Shutdown has an eight-second
 deadline and exits with failure if a save fails or the deadline is exceeded. A hard kill
 or power failure can still lose stats that have not reached the five-minute save.
