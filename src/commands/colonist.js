@@ -1,7 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import { addWin, addLoss, getPlayerStats } from "../utils/colonistSystem.js";
-import { addXP } from "../utils/levelingSystem.js";
-import { economy } from '../utils/economySystem.js';
+import { recordWinWithRewards, addLoss, getPlayerStats } from "../utils/colonistSystem.js";
 
 const command = {
   data: new SlashCommandBuilder()
@@ -33,24 +31,15 @@ const command = {
     
     if (subcommand === 'win') {
       await interaction.deferReply();
+      let recorded = false;
       
       try {
         const userId = interaction.user.id;
         const username = interaction.user.username;
         
-        // Add win and get rewards
-        const result = await addWin(userId, username);
-        
-        if (!result || typeof result !== 'object') {
-          throw new Error('Failed to record win: Invalid result from addWin');
-        }
-        
-        // Give XP reward
-        const xpResult = await addXP(userId, result.xpReward);
-        
-        // Give coin reward
-        const newBalance = await economy.addCoins(userId, result.coinReward);
-        
+        const { result, xpResult, newBalance } = await recordWinWithRewards(userId, username);
+        recorded = true;
+
         // Build response
         const winRate = result.totalGames > 0 
           ? ((result.wins / result.totalGames) * 100).toFixed(1) 
@@ -86,7 +75,10 @@ const command = {
         
       } catch (error) {
         console.error('Colonist win error:', error);
-        await interaction.editReply('❌ Error recording win. Please try again.');
+        const message = recorded
+          ? '✅ Your win and rewards are already recorded. Check /colonist stats before recording another game.'
+          : '❌ Error recording win. Please try again.';
+        await interaction.editReply(message);
       }
       
     } else if (subcommand === 'loss') {

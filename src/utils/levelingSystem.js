@@ -6,13 +6,16 @@ const getXPForLevel = (level) => level * level * 100;
 export const initializeData = store.initialize;
 export const flushLevelingData = store.flush;
 
-export const addXP = (userId, xpGained = 15) => store.update((users) => {
+export const addXP = (userId, xpGained = 15, { beforeCommit } = {}) => store.update(async (users) => {
   users[userId] ??= { xp: 0, level: 1 };
   const user = users[userId];
   user.xp += xpGained;
   const leveledUp = user.xp >= getXPForLevel(user.level + 1);
   if (leveledUp) user.level += 1;
-  return { ...user, leveledUp, xpForNextLevel: getXPForLevel(user.level + 1) };
+  const result = { ...user, leveledUp, xpForNextLevel: getXPForLevel(user.level + 1) };
+  // A failed dependent reward discards this draft without touching concurrent XP updates.
+  if (beforeCommit) await beforeCommit();
+  return result;
 });
 
 export const getUserLevel = (userId) => store.update((users) => {

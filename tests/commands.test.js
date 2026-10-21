@@ -14,9 +14,10 @@ const { default: gamble } = await import('../src/commands/gamble.js');
 const { default: colonist } = await import('../src/commands/colonist.js');
 const { default: remind, parseTime } = await import('../src/commands/remind.js');
 const { default: groq } = await import('../src/commands/groq-chat.js');
+const { economy } = await import('../src/utils/economySystem.js');
 const { flushPubgWinsData, getPlayerWins } = await import('../src/utils/pubgWinsSystem.js');
-const { flushColonistData } = await import('../src/utils/colonistSystem.js');
-const { flushLevelingData } = await import('../src/utils/levelingSystem.js');
+const { flushColonistData, getPlayerStats, addLoss } = await import('../src/utils/colonistSystem.js');
+const { flushLevelingData, getUserLevel, addXP } = await import('../src/utils/levelingSystem.js');
 
 after(async () => {
   await Promise.all([flushPubgWinsData(), flushColonistData(), flushLevelingData()]);
@@ -153,4 +154,121 @@ test('Groq command reports a retired model distinctly and caps embed size', asyn
     if (originalKey === undefined) delete process.env.GROQ_API_KEY;
     else process.env.GROQ_API_KEY = originalKey;
   }
+});
+
+const withFailedEconomyWrite = async (run) => {
+  const file = path.join(directory, 'economy.json');
+  const prior = await fs.readFile(file);
+  await fs.unlink(file);
+  await fs.mkdir(file);
+  try { return await run(); }
+  finally {
+    await fs.rmdir(file);
+    await fs.writeFile(file, prior);
+  }
+};
+
+const quietlyRecordWin = async (request) => {
+  const originalError = console.error;
+  console.error = () => {};
+  try { await colonist.execute(request); }
+  finally { console.error = originalError; }
+};
+
+test('failed Colonist coin writes leave no win or XP and a retry grants rewards once', async () => {
+  const userId = 'colonist-retry-user';
+  await economy.getBalance(userId);
+  await getUserLevel(userId);
+  await flushLevelingData();
+  let response;
+  const request = interaction(userId, { subcommand: 'win' });
+  request.editReply = async (value) => { response = value; };
+  await withFailedEconomyWrite(() => quietlyRecordWin(request));
+  assert.match(response, /Error recording win/);
+  assert.equal(await getPlayerStats(userId), null);
+  assert.equal((await getUserLevel(userId)).xp, 0);
+  assert.equal((await economy.getBalance(userId)).coins, 100);
+  await Promise.all([flushColonistData(), flushLevelingData()]);
+  const savedWins = JSON.parse(await fs.readFile(path.join(directory, 'colonistWins.json'), 'utf8'));
+  const savedXP = JSON.parse(await fs.readFile(path.join(directory, 'userLevels.json'), 'utf8'));
+  assert.equal(savedWins[userId], undefined);
+  assert.equal(savedXP[userId].xp, 0);
+
+  await colonist.execute(request);
+  const stats = await getPlayerStats(userId);
+  assert.equal(stats.wins, 1);
+  assert.equal(stats.totalGames, 1);
+  assert.equal(stats.currentStreak, 1);
+  assert.equal((await getUserLevel(userId)).xp, 50);
+  assert.equal((await economy.getBalance(userId)).coins, 200);
+});
+
+test('failed Colonist rewards preserve an existing streak and its next bonus', async () => {
+  const userId = 'colonist-streak-user';
+  const request = interaction(userId, { subcommand: 'win' });
+  await colonist.execute(request);
+  await colonist.execute(request);
+  await addXP(userId, 250);
+  const before = await getPlayerStats(userId);
+  const beforeXP = await getUserLevel(userId);
+  await withFailedEconomyWrite(() => quietlyRecordWin(request));
+  assert.deepEqual(await getPlayerStats(userId), before);
+  assert.deepEqual(await getUserLevel(userId), beforeXP);
+  assert.equal((await economy.getBalance(userId)).coins, 300);
+
+  await colonist.execute(request);
+  const stats = await getPlayerStats(userId);
+  assert.equal(stats.wins, 3);
+  assert.equal(stats.totalGames, 3);
+  assert.equal(stats.currentStreak, 3);
+  assert.equal(stats.longestStreak, 3);
+  assert.equal((await getUserLevel(userId)).xp, 425);
+  assert.equal((await getUserLevel(userId)).level, 2);
+  assert.equal((await economy.getBalance(userId)).coins, 450);
+});
+
+test('a failed win preserves concurrent message XP and a queued loss', async () => {
+  const userId = 'colonist-concurrent-user';
+  await economy.getBalance(userId);
+  const originalAddCoins = economy.addCoins;
+  let entered;
+  let release;
+  const waiting = new Promise((resolve) => { entered = resolve; });
+  const gate = new Promise((resolve) => { release = resolve; });
+  economy.addCoins = async (...args) => { entered(); await gate; return originalAddCoins(...args); };
+  try {
+    await withFailedEconomyWrite(async () => {
+      const win = quietlyRecordWin(interaction(userId, { subcommand: 'win' }));
+      await waiting;
+      const message = addXP(userId, 15);
+      const loss = addLoss(userId, userId);
+      release();
+      await Promise.all([win, message, loss]);
+    });
+  } finally {
+    release();
+    economy.addCoins = originalAddCoins;
+  }
+  const stats = await getPlayerStats(userId);
+  assert.equal(stats.wins, 0);
+  assert.equal(stats.totalGames, 1);
+  assert.equal(stats.currentStreak, 0);
+  assert.equal((await getUserLevel(userId)).xp, 15);
+  assert.equal((await economy.getBalance(userId)).coins, 100);
+});
+
+test('a response failure after a saved win does not tell the user to record it again', async () => {
+  const userId = 'colonist-response-user';
+  const request = interaction(userId, { subcommand: 'win' });
+  let response;
+  request.editReply = async (value) => {
+    if (typeof value !== 'string') throw new Error('Discord reply failed');
+    response = value;
+  };
+  await quietlyRecordWin(request);
+  assert.match(response, /already.*recorded/i);
+  assert.doesNotMatch(response, /try again/i);
+  assert.equal((await getPlayerStats(userId)).wins, 1);
+  assert.equal((await getUserLevel(userId)).xp, 50);
+  assert.equal((await economy.getBalance(userId)).coins, 200);
 });
