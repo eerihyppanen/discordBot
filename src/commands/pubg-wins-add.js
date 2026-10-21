@@ -1,9 +1,10 @@
-import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
+import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } from "discord.js";
 import { updatePlayerWins } from "../utils/pubgWinsSystem.js";
 
 const command = {
   data: new SlashCommandBuilder()
     .setName('pubg-wins-add')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDescription('Manually add or update PUBG player win statistics')
     .addStringOption(option =>
       option.setName('username')
@@ -47,6 +48,10 @@ const command = {
     ),
   
   async execute(interaction) {
+    if (!interaction.inGuild() || !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+      return interaction.reply({ content: '❌ You need the Manage Server permission to update PUBG stats.', flags: MessageFlags.Ephemeral });
+    }
+
     const username = interaction.options.getString('username');
     const platform = interaction.options.getString('platform');
     const wins = interaction.options.getInteger('wins');
@@ -67,6 +72,11 @@ const command = {
       // Update player stats
       await updatePlayerWins(username, platform, region, wins, matches, parseFloat(winRate));
       
+      console.info('Manual PUBG stats update:', {
+        actorId: interaction.user.id, guildId: interaction.guildId,
+        username, platform, region, wins, matches,
+      });
+
       const embed = new EmbedBuilder()
         .setColor('#00FF00')
         .setTitle('✅ PUBG Stats Updated')

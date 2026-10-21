@@ -76,3 +76,45 @@ Once the bot is added it will appear on your Discord server in offline mode.
 You can now run the code in the repository using the command line by typing the command `npm start`. 
 
 
+
+## Running and updating this bot
+
+Use Node.js 18 or newer and install the locked dependencies with `npm ci`.
+Copy `.env-sample` to `.env` and set `TOKEN`, `CLIENT_ID`, and `GUILD_ID`.
+The game and AI commands also need their corresponding API keys.
+
+- Run `npm test` for the regression suite and `npm run build` to compile the bot.
+- Run `npm run deploy-commands` after updating slash command definitions. In particular,
+  `/pubg-wins-add` now requires **Manage Server** both in its default command permissions
+  and when it executes. Successful manual edits log the actor and changed values.
+- `GROQ_MODEL` selects the Groq model; the default is `openai/gpt-oss-20b`.
+  Check [Groq's supported models](https://console.groq.com/docs/models) when changing it.
+  Authentication, model, rate-limit, timeout, and invalid-response errors are reported separately.
+
+### Persistent data and shutdown
+
+`DATA_DIR` defaults to `data` in the working directory. Existing `economy.json`,
+`userLevels.json`, `pubgWins.json`, and `colonistWins.json` files keep their current formats.
+No migration is needed. Economy updates share a queue and are written before success is
+reported. Every JSON write uses a temporary file and atomic replacement; malformed or
+unreadable data is reported instead of silently resetting users.
+
+Keep `DATA_DIR` on a persistent disk or volume, including when deploying to Railway or
+Docker. For example, mount a volume at `/data` and set `DATA_DIR=/data`. Back up this
+folder before deploying. Run **one bot process per data directory**: the write queue is
+within a process, so replicas must not share these JSON files.
+
+XP, PUBG wins, and Colonist statistics still batch writes for up to five minutes to reduce
+SD-card writes. Both `SIGINT` and `SIGTERM` stop accepting new work, flush current state,
+finish in-flight commands, flush again, and then disconnect Discord. Shutdown has an eight-second
+deadline and exits with failure if a save fails or the deadline is exceeded. A hard kill
+or power failure can still lose stats that have not reached the five-minute save.
+
+### Reminders
+
+Reminders are stored in `reminders.json` before confirmation and checked every 15 seconds.
+Pending and overdue reminders resume when the bot is online again. Delivery first tries
+a DM, then a normal bot message in the original channel, so it does not depend on an old
+interaction token. If both destinations fail, the reminder stays saved and retries with
+backoff. The bot needs permission to send messages and embed links in the fallback channel.
+A crash after sending but before recording completion can cause a duplicate reminder.

@@ -1,43 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { addWin, addLoss, getPlayerStats } from "../utils/colonistSystem.js";
 import { addXP } from "../utils/levelingSystem.js";
-import fs from 'fs/promises';
-import path from 'path';
-
-const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
-
-// Helper to load economy data
-const loadEconomy = async () => {
-  try {
-    const data = await fs.readFile(ECONOMY_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    return {};
-  }
-};
-
-// Helper to save economy data
-const saveEconomy = async (data) => {
-  try {
-    await fs.mkdir(path.dirname(ECONOMY_FILE), { recursive: true });
-    await fs.writeFile(ECONOMY_FILE, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error('Error saving economy data:', error);
-  }
-};
-
-// Helper to add coins to user
-const addCoins = async (userId, amount) => {
-  const economy = await loadEconomy();
-  
-  if (!economy[userId]) {
-    economy[userId] = { coins: 100, bank: 0 };
-  }
-  
-  economy[userId].coins += amount;
-  await saveEconomy(economy);
-  return economy[userId].coins;
-};
+import { economy } from '../utils/economySystem.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -85,7 +49,7 @@ const command = {
         const xpResult = await addXP(userId, result.xpReward);
         
         // Give coin reward
-        const newBalance = await addCoins(userId, result.coinReward);
+        const newBalance = await economy.addCoins(userId, result.coinReward);
         
         // Build response
         const winRate = result.totalGames > 0 

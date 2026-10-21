@@ -9,7 +9,8 @@
     "test-bot": "npm run build && node -r dotenv/config build/test-bot.js",
     "dev": "nodemon",
     "prod": "node build/app.js",
-    "test": "mocha -r esbuild-runner/register ./tests/*.spec.js --exit"
+    "test": "node --test tests/*.test.js",
+    "deploy-commands": "node deploy-commands.mjs"
   },
   "keywords": [
     "discord",

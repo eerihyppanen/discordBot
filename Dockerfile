@@ -21,4 +21,4 @@ COPY --from=builder /app/build /app/build
 
 RUN npm ci --omit=dev
 
-ENTRYPOINT [ "npm", "run", "prod" ]
+ENTRYPOINT [ "node", "build/app.js" ]

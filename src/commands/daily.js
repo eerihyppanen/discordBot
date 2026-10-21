@@ -1,33 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import fs from 'fs/promises';
-import path from 'path';
-
-const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
-
-// Add the missing helper functions
-const loadEconomy = async () => {
-  try {
-    console.log(`💰 Loading economy data from: ${ECONOMY_FILE}`);
-    const data = await fs.readFile(ECONOMY_FILE, 'utf8');
-    const parsed = JSON.parse(data);
-    console.log(`✅ Loaded economy data for ${Object.keys(parsed).length} users`);
-    return parsed;
-  } catch (error) {
-    console.log(`⚠️ No existing economy data found, creating new file: ${error.message}`);
-    return {};
-  }
-};
-
-const saveEconomy = async (data) => {
-  try {
-    console.log(`💾 Saving economy data to: ${ECONOMY_FILE}`);
-    await fs.mkdir(path.dirname(ECONOMY_FILE), { recursive: true });
-    await fs.writeFile(ECONOMY_FILE, JSON.stringify(data, null, 2));
-    console.log(`✅ Saved economy data for ${Object.keys(data).length} users`);
-  } catch (error) {
-    console.error('❌ Error saving economy data:', error);
-  }
-};
+import { economy } from '../utils/economySystem.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -35,40 +7,25 @@ const command = {
     .setDescription('Claim your daily reward'),
   
   async execute(interaction) {
-    const economy = await loadEconomy();
-    const userId = interaction.user.id;
-    
-    if (!economy[userId]) {
-      economy[userId] = { coins: 100, bank: 0, lastDaily: 0 };
+    await interaction.deferReply();
+    const result = await economy.claimDaily(interaction.user.id);
+    if (!result.claimed) {
+      const hours = Math.floor(result.timeLeft / (60 * 60 * 1000));
+      const minutes = Math.floor((result.timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+      return interaction.editReply(`⏰ You already claimed your daily reward! Come back in ${hours}h ${minutes}m`);
     }
-    
-    const now = Date.now();
-    const lastDaily = economy[userId].lastDaily || 0;
-    const timeLeft = 24 * 60 * 60 * 1000 - (now - lastDaily);
-    
-    if (timeLeft > 0) {
-      const hours = Math.floor(timeLeft / (60 * 60 * 1000));
-      const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
-      
-      return interaction.reply(`⏰ You already claimed your daily reward! Come back in ${hours}h ${minutes}m`);
-    }
-    
-    const reward = Math.floor(Math.random() * 500) + 100; // 100-599 coins
-    economy[userId].coins += reward;
-    economy[userId].lastDaily = now;
-    
-    await saveEconomy(economy);
-    
+    const { reward, balance } = result;
+
     const embed = new EmbedBuilder()
       .setColor('#00ff00')
       .setTitle('🎁 Daily Reward Claimed!')
       .setDescription(`You received **${reward} coins**!`)
       .addFields(
-        { name: 'New Balance', value: `${economy[userId].coins} coins`, inline: true }
+        { name: 'New Balance', value: `${balance} coins`, inline: true }
       )
       .setTimestamp();
     
-    await interaction.reply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
   },
 };
 
