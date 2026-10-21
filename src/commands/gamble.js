@@ -1,27 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import fs from 'fs/promises';
-import path from 'path';
-
-const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
-
-// Helper functions
-const loadEconomy = async () => {
-  try {
-    const data = await fs.readFile(ECONOMY_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    return {};
-  }
-};
-
-const saveEconomy = async (data) => {
-  try {
-    await fs.mkdir(path.dirname(ECONOMY_FILE), { recursive: true });
-    await fs.writeFile(ECONOMY_FILE, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error('Error saving economy data:', error);
-  }
-};
+import { economy } from '../utils/economySystem.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -87,38 +65,25 @@ const command = {
     const amount = interaction.options.getInteger('amount');
     const userId = interaction.user.id;
     
-    const economy = await loadEconomy();
-    
-    // Initialize user if doesn't exist
-    if (!economy[userId]) {
-      economy[userId] = { coins: 100, bank: 0, lastDaily: 0 };
-    }
-    
-    // Check if user has enough coins
-    if (economy[userId].coins < amount) {
-      return interaction.reply(`❌ You don't have enough coins! You have ${economy[userId].coins} coins but tried to bet ${amount}.`);
-    }
-    
-    let result;
-    switch (subcommand) {
-      case 'coinflip':
-        result = await handleCoinflip(interaction, economy, userId, amount);
-        break;
-      case 'slots':
-        result = await handleSlots(interaction, economy, userId, amount);
-        break;
-      case 'dice':
-        result = await handleDice(interaction, economy, userId, amount);
-        break;
-    }
-    
-    await saveEconomy(economy);
-    return result;
+    await interaction.deferReply();
+    const result = await economy.updateUser(userId, (user) => {
+      if (user.coins < amount) {
+        return { content: `❌ You don't have enough coins! You have ${user.coins} coins but tried to bet ${amount}.` };
+      }
+      const users = { [userId]: user };
+      switch (subcommand) {
+        case 'coinflip': return handleCoinflip(interaction, users, userId, amount);
+        case 'slots': return handleSlots(interaction, users, userId, amount);
+        case 'dice': return handleDice(interaction, users, userId, amount);
+        default: throw new Error('Unknown gambling game');
+      }
+    });
+    await interaction.editReply(result);
   },
 };
 
 // Coinflip game
-const handleCoinflip = async (interaction, economy, userId, amount) => {
+const handleCoinflip = (interaction, economy, userId, amount) => {
   const choice = interaction.options.getString('choice');
   const flip = Math.random() < 0.5 ? 'heads' : 'tails';
   const won = choice === flip;
@@ -138,7 +103,7 @@ const handleCoinflip = async (interaction, economy, userId, amount) => {
       )
       .setTimestamp();
     
-    return interaction.reply({ embeds: [embed] });
+    return { embeds: [embed.toJSON()] };
   } else {
     economy[userId].coins -= amount;
     const embed = new EmbedBuilder()
@@ -152,12 +117,12 @@ const handleCoinflip = async (interaction, economy, userId, amount) => {
       )
       .setTimestamp();
     
-    return interaction.reply({ embeds: [embed] });
+    return { embeds: [embed.toJSON()] };
   }
 };
 
 // Slot machine game
-const handleSlots = async (interaction, economy, userId, amount) => {
+const handleSlots = (interaction, economy, userId, amount) => {
   const symbols = ['🍒', '🍋', '🍊', '🍇', '⭐', '💎', '7️⃣'];
   const reel1 = symbols[Math.floor(Math.random() * symbols.length)];
   const reel2 = symbols[Math.floor(Math.random() * symbols.length)];
@@ -199,7 +164,7 @@ const handleSlots = async (interaction, economy, userId, amount) => {
       )
       .setTimestamp();
     
-    return interaction.reply({ embeds: [embed] });
+    return { embeds: [embed.toJSON()] };
   } else {
     economy[userId].coins -= amount;
     const embed = new EmbedBuilder()
@@ -213,12 +178,12 @@ const handleSlots = async (interaction, economy, userId, amount) => {
       )
       .setTimestamp();
     
-    return interaction.reply({ embeds: [embed] });
+    return { embeds: [embed.toJSON()] };
   }
 };
 
 // Dice game
-const handleDice = async (interaction, economy, userId, amount) => {
+const handleDice = (interaction, economy, userId, amount) => {
   const guess = interaction.options.getString('guess');
   const dice1 = Math.floor(Math.random() * 6) + 1;
   const dice2 = Math.floor(Math.random() * 6) + 1;
@@ -244,7 +209,7 @@ const handleDice = async (interaction, economy, userId, amount) => {
       )
       .setTimestamp();
     
-    return interaction.reply({ embeds: [embed] });
+    return { embeds: [embed.toJSON()] };
   } else {
     economy[userId].coins -= amount;
     const embed = new EmbedBuilder()
@@ -259,7 +224,7 @@ const handleDice = async (interaction, economy, userId, amount) => {
       )
       .setTimestamp();
     
-    return interaction.reply({ embeds: [embed] });
+    return { embeds: [embed.toJSON()] };
   }
 };
 

@@ -1,9 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import fs from 'fs/promises';
-import path from 'path';
-import { getRoleForLevel } from "../utils/levelingSystem.js";
-
-const DATA_FILE = path.join(process.cwd(), 'data', 'userLevels.json');
+import { getLevelLeaderboard, getRoleForLevel } from "../utils/levelingSystem.js";
 
 const command = {
   data: new SlashCommandBuilder()
@@ -11,18 +7,11 @@ const command = {
     .setDescription('Show the top 10 users by level'),
   
   async execute(interaction) {
+    await interaction.deferReply();
     try {
-      const data = await fs.readFile(DATA_FILE, 'utf8');
-      const userData = JSON.parse(data);
-      
-      // Sort users by level, then by XP
-      const sortedUsers = Object.entries(userData)
-        .sort(([,a], [,b]) => {
-          if (b.level !== a.level) return b.level - a.level;
-          return b.xp - a.xp;
-        })
-        .slice(0, 10);
-      
+      // Read the same in-memory XP data as /level, including changes not yet saved.
+      const sortedUsers = await getLevelLeaderboard();
+
       const embed = new EmbedBuilder()
         .setColor('#ffd700')
         .setTitle('🏆 Server Leaderboard')
@@ -45,10 +34,10 @@ const command = {
       
       embed.setDescription(description || 'No users found.');
       
-      await interaction.reply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       console.error('Error reading leaderboard:', error);
-      await interaction.reply('Error loading leaderboard data.');
+      await interaction.editReply('Error loading leaderboard data.');
     }
   },
 };

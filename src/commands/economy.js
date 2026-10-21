@@ -1,26 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import fs from 'fs/promises';
-import path from 'path';
-
-const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
-
-const loadEconomy = async () => {
-  try {
-    const data = await fs.readFile(ECONOMY_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    return {};
-  }
-};
-
-const saveEconomy = async (data) => {
-  try {
-    await fs.mkdir(path.dirname(ECONOMY_FILE), { recursive: true });
-    await fs.writeFile(ECONOMY_FILE, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error('Error saving economy data:', error);
-  }
-};
+import { economy } from '../utils/economySystem.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -34,15 +13,9 @@ const command = {
   
   async execute(interaction) {
     const targetUser = interaction.options.getUser('user') || interaction.user;
-    const economy = await loadEconomy();
-    
-    if (!economy[targetUser.id]) {
-      economy[targetUser.id] = { coins: 100, bank: 0 };
-      await saveEconomy(economy);
-    }
-    
-    const userEconomy = economy[targetUser.id];
-    
+    await interaction.deferReply();
+    const userEconomy = await economy.getBalance(targetUser.id);
+
     const embed = new EmbedBuilder()
       .setColor('#ffd700')
       .setTitle(`💰 ${targetUser.username}'s Balance`)
@@ -54,7 +27,7 @@ const command = {
       .setThumbnail(targetUser.displayAvatarURL())
       .setTimestamp();
     
-    await interaction.reply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
   },
 };
 

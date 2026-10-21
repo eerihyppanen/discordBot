@@ -1,43 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import { addWin, addLoss, getPlayerStats } from "../utils/colonistSystem.js";
-import { addXP } from "../utils/levelingSystem.js";
-import fs from 'fs/promises';
-import path from 'path';
-
-const ECONOMY_FILE = path.join(process.cwd(), 'data', 'economy.json');
-
-// Helper to load economy data
-const loadEconomy = async () => {
-  try {
-    const data = await fs.readFile(ECONOMY_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    return {};
-  }
-};
-
-// Helper to save economy data
-const saveEconomy = async (data) => {
-  try {
-    await fs.mkdir(path.dirname(ECONOMY_FILE), { recursive: true });
-    await fs.writeFile(ECONOMY_FILE, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error('Error saving economy data:', error);
-  }
-};
-
-// Helper to add coins to user
-const addCoins = async (userId, amount) => {
-  const economy = await loadEconomy();
-  
-  if (!economy[userId]) {
-    economy[userId] = { coins: 100, bank: 0 };
-  }
-  
-  economy[userId].coins += amount;
-  await saveEconomy(economy);
-  return economy[userId].coins;
-};
+import { recordWinWithRewards, addLoss, getPlayerStats } from "../utils/colonistSystem.js";
 
 const command = {
   data: new SlashCommandBuilder()
@@ -69,24 +31,15 @@ const command = {
     
     if (subcommand === 'win') {
       await interaction.deferReply();
+      let recorded = false;
       
       try {
         const userId = interaction.user.id;
         const username = interaction.user.username;
         
-        // Add win and get rewards
-        const result = await addWin(userId, username);
-        
-        if (!result || typeof result !== 'object') {
-          throw new Error('Failed to record win: Invalid result from addWin');
-        }
-        
-        // Give XP reward
-        const xpResult = await addXP(userId, result.xpReward);
-        
-        // Give coin reward
-        const newBalance = await addCoins(userId, result.coinReward);
-        
+        const { result, xpResult, newBalance } = await recordWinWithRewards(userId, username);
+        recorded = true;
+
         // Build response
         const winRate = result.totalGames > 0 
           ? ((result.wins / result.totalGames) * 100).toFixed(1) 
@@ -122,7 +75,10 @@ const command = {
         
       } catch (error) {
         console.error('Colonist win error:', error);
-        await interaction.editReply('❌ Error recording win. Please try again.');
+        const message = recorded
+          ? '✅ Your win and rewards are already recorded. Check /colonist stats before recording another game.'
+          : '❌ Error recording win. Please try again.';
+        await interaction.editReply(message);
       }
       
     } else if (subcommand === 'loss') {
