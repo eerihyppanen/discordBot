@@ -1,7 +1,8 @@
 import { createJsonStore, dataFile } from './jsonStore.js';
 
 const store = createJsonStore(dataFile('userLevels.json'), { saveDelayMs: 5 * 60 * 1000 });
-const getXPForLevel = (level) => level * level * 100;
+// Preserve existing level thresholds; a new level-1 user starts at zero XP.
+export const getXPForLevel = (level) => level <= 1 ? 0 : level * level * 100;
 
 export const initializeData = store.initialize;
 export const flushLevelingData = store.flush;

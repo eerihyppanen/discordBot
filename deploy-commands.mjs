@@ -1,98 +1,54 @@
 import { REST, Routes } from 'discord.js';
 import dotenv from 'dotenv';
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-// Load environment variables and handle missing values
-dotenv.config();
+const defaultCommandsPath = fileURLToPath(new URL('./src/commands/', import.meta.url));
 
-// Check for required environment variables
-if (!process.env.TOKEN || !process.env.CLIENT_ID || !process.env.GUILD_ID) {
-  console.error('❌ ERROR: Missing required environment variables!');
-  console.error('Please ensure your .env file contains:');
-  console.error('TOKEN=your_bot_token');
-  console.error('CLIENT_ID=your_application_id');
-  console.error('GUILD_ID=your_server_id');
-  process.exit(1);
-}
+export const loadCommands = async (commandsPath) => {
+  const files = (await fs.readdir(commandsPath)).filter(file => file.endsWith('.js')).sort();
+  if (files.length === 0) throw new Error('No command files found; refusing to replace the command list.');
 
-// Set up file path handling
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Command loading
-const commands = [];
-const commandsPath = path.join(__dirname, 'src', 'commands');
-
-// Check if commands directory exists
-if (!fs.existsSync(commandsPath)) {
-  console.error(`❌ ERROR: Commands directory not found at: ${commandsPath}`);
-  process.exit(1);
-}
-
-try {
-  const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-  
-  if (commandFiles.length === 0) {
-    console.warn('⚠️ WARNING: No command files (.js) found in the commands directory.');
-    console.warn(`Directory checked: ${commandsPath}`);
-    process.exit(1);
-  }
-
-  console.log(`🔍 Found ${commandFiles.length} potential command files.`);
-  console.log('Loading command files to deploy...');
-
-  // Process each command file
-  for (const file of commandFiles) {
+  const commands = [];
+  const names = new Set();
+  for (const file of files) {
     try {
-      const filePath = path.join(commandsPath, file);
-      console.log(`Processing: ${file}...`);
-      
-      const commandModule = await import(filePath);
-      const command = commandModule.default;
-      
-      if (!command) {
-        console.error(`❌ ERROR: Missing default export in ${file}`);
-        continue;
+      const { default: command } = await import(pathToFileURL(path.join(commandsPath, file)).href);
+      if (!command?.data || typeof command.data.toJSON !== 'function' || typeof command.execute !== 'function') {
+        throw new Error('Command must export data and an execute function.');
       }
-      
-      if ('data' in command) {
-        commands.push(command.data.toJSON());
-        console.log(`✅ [SUCCESS] Loaded /${command.data.name} for deployment.`);
-      } else {
-        console.error(`❌ [WARNING] The command at ${filePath} is missing a "data" property.`);
-      }
-    } catch (fileError) {
-      console.error(`❌ Error processing command file ${file}:`);
-      console.error(fileError);
+      const definition = command.data.toJSON();
+      if (!definition.name || names.has(definition.name)) throw new Error('Missing or duplicate command name.');
+      names.add(definition.name);
+      commands.push(definition);
+    } catch (cause) {
+      throw new Error(`Cannot load ${file}; no commands were published.`, { cause });
     }
   }
+  return commands;
+};
 
-  if (commands.length === 0) {
-    console.error('❌ No valid commands found to deploy.');
-    process.exit(1);
-  }
+export const deployCommands = async ({ commandsPath = defaultCommandsPath, rest, clientId, guildId }) => {
+  // Validate every command before performing Discord's all-or-nothing list replacement.
+  const commands = await loadCommands(commandsPath);
+  return rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
+};
 
-  // Deploy commands
-  const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
-
-  console.log(`📤 Started refreshing ${commands.length} application (/) commands.`);
-  console.log(`Guild ID: ${process.env.GUILD_ID.substring(0, 4)}...`);
-  console.log(`Client ID: ${process.env.CLIENT_ID.substring(0, 4)}...`);
-
+export const main = async () => {
   try {
-    const data = await rest.put(
-      Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-      { body: commands },
-    );
-
-    console.log(`✅ [SUCCESS] Successfully reloaded ${data.length} application (/) commands.`);
-  } catch (apiError) {
-    console.error('❌ Error deploying commands to Discord API:');
-    console.error(apiError);
+    dotenv.config();
+    const { TOKEN, CLIENT_ID, GUILD_ID } = process.env;
+    if (!TOKEN || !CLIENT_ID || !GUILD_ID) throw new Error('TOKEN, CLIENT_ID and GUILD_ID are required.');
+    const rest = new REST({ version: '10' }).setToken(TOKEN);
+    const data = await deployCommands({ rest, clientId: CLIENT_ID, guildId: GUILD_ID });
+    console.log(`Successfully reloaded ${data.length} application commands.`);
+  } catch (error) {
+    console.error('Command deployment failed:', error);
+    process.exitCode = 1;
   }
-} catch (mainError) {
-  console.error('❌ An unexpected error occurred:');
-  console.error(mainError);
+};
+
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  await main();
 }

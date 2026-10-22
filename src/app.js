@@ -8,6 +8,7 @@ import { initializeColonistData, flushColonistData } from "./utils/colonistSyste
 
 import { economy } from './utils/economySystem.js';
 import { reminders } from './utils/reminderSystem.js';
+import { skins } from './utils/skinSystem.js';
 import { createLifecycle } from './utils/lifecycle.js';
 
 // Load data before accepting events. Existing JSON files keep their format.
@@ -16,6 +17,7 @@ await initializePubgWinsData();
 await initializeColonistData();
 await economy.initialize();
 await reminders.initialize();
+await skins.initialize();
 
 // Debug environment variables
 console.log('🔍 Environment Check:');
@@ -41,7 +43,7 @@ let heartbeat;
 let loginRetry;
 const lifecycle = createLifecycle({
   client,
-  flushers: [flushLevelingData, flushPubgWinsData, flushColonistData, economy.flush, reminders.flush],
+  flushers: [flushLevelingData, flushPubgWinsData, flushColonistData, economy.flush, reminders.flush, skins.flush],
   stop: async () => {
     clearInterval(heartbeat);
     clearTimeout(loginRetry);

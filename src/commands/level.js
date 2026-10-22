@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import { getUserLevel, getRoleForLevel } from "../utils/levelingSystem.js";
+import { getUserLevel, getRoleForLevel, getXPForLevel } from "../utils/levelingSystem.js";
 
 const command = {
   data: new SlashCommandBuilder()
@@ -37,12 +37,9 @@ const command = {
   },
 };
 
-// Helper function to create XP for level calculation
-const getXPForLevel = (level) => (level - 1) * (level - 1) * 100;
-
 // Helper function to create progress bar
 const createProgressBar = (current, total) => {
-  const percentage = Math.min(current / total, 1);
+  const percentage = Math.max(0, Math.min(current / total, 1));
   const filledBars = Math.round(percentage * 10);
   const emptyBars = 10 - filledBars;
   

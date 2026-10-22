@@ -31,8 +31,8 @@ const showGeneralHelp = async (interaction) => {
         name: '🎮 Gaming Commands',
         value: [
           '`/faceit <username>` - Check FACEIT CS2/CSGO stats',
-          '`/pubg <username> <platform>` - Check PUBG player stats',
-          '`/pubg-wins <username> <platform>` - Track PUBG win statistics',
+          '`/pubg <username>` - Check PUBG player stats',
+          '`/pubg-wins <username>` - Track PUBG win statistics',
           '`/pubg-wins-add <username> <platform> <wins> <matches>` - Manually add wins',
           '`/pubg-leaderboard` - View top PUBG players by wins',
           '`/8ball <question>` - Ask the magic 8-ball a question'
@@ -151,10 +151,10 @@ const getCommandDetails = (commandName) => {
       notes: 'Requires FACEIT API key to be configured'
     },
     'pubg': {
-      description: 'Check PUBG player statistics',
-      usage: '/pubg <username> <platform> [region]',
-      parameters: '`username` - PUBG username\n`platform` - steam/xbox/psn\n`region` - Server region (default: EU)',
-      examples: '/pubg PlayerName steam\n/pubg PlayerName xbox pc-na',
+      description: 'Check PUBG Steam PC player statistics',
+      usage: '/pubg <username>',
+      parameters: '`username` - PUBG Steam PC username',
+      examples: '/pubg PlayerName',
       notes: 'Shows recent match stats and player info'
     },
     '8ball': {

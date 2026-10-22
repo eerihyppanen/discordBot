@@ -87,6 +87,10 @@ The game and AI commands also need their corresponding API keys.
 - Run `npm run deploy-commands` after updating slash command definitions. In particular,
   `/pubg-wins-add` now requires **Manage Server** both in its default command permissions
   and when it executes. Successful manual edits log the actor and changed values.
+- `/pubg <username>` and `/pubg-wins <username>` search Steam PC players only.
+  Re-register the commands to remove their old platform and region options.
+  Command registration validates the entire command set before replacing it in Discord;
+  an invalid command or a failed API request exits with failure.
 - `GROQ_MODEL` selects the Groq model; the default is `openai/gpt-oss-20b`.
   Check [Groq's supported models](https://console.groq.com/docs/models) when changing it.
   Authentication, model, rate-limit, timeout, and invalid-response errors are reported separately.
@@ -94,10 +98,17 @@ The game and AI commands also need their corresponding API keys.
 ### Persistent data and shutdown
 
 `DATA_DIR` defaults to `data` in the working directory. Existing `economy.json`,
-`userLevels.json`, `pubgWins.json`, and `colonistWins.json` files keep their current formats.
-No migration is needed. Economy updates share a queue and are written before success is
+`userLevels.json`, `pubgWins.json`, `colonistWins.json`, and `pubgSkins.json` files keep their current formats.
+No data-format migration is needed. Economy updates share a queue and are written before success is
 reported. Every JSON write uses a temporary file and atomic replacement; malformed or
 unreadable data is reported instead of silently resetting users.
+
+Legendary skins now also use `DATA_DIR`, queued atomic writes, and save-before-confirmation.
+Viewing counts, lists, or leaderboards does not write skin data. If you previously set a
+custom `DATA_DIR`, the old skin command still wrote to `data/pubgSkins.json` in the bot's
+working directory. Stop the bot and back up that file before upgrading, then copy it into
+`DATA_DIR` if no skin file is already present there. If both files exist, reconcile them
+before starting; do not overwrite either collection blindly.
 
 Keep `DATA_DIR` on a persistent disk or volume, including when deploying to Railway or
 Docker. For example, mount a volume at `/data` and set `DATA_DIR=/data`. Back up this
