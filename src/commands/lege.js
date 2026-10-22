@@ -1,27 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import fs from 'fs/promises';
-import path from 'path';
-
-const SKINS_FILE = path.join(process.cwd(), 'data', 'pubgSkins.json');
-
-// Helper functions for skin data
-const loadSkinData = async () => {
-  try {
-    const data = await fs.readFile(SKINS_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    return {};
-  }
-};
-
-const saveSkinData = async (data) => {
-  try {
-    await fs.mkdir(path.dirname(SKINS_FILE), { recursive: true });
-    await fs.writeFile(SKINS_FILE, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error('Error saving skin data:', error);
-  }
-};
+import { skins, emptyCollection } from '../utils/skinSystem.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -60,22 +38,15 @@ const command = {
   
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
-    const skinData = await loadSkinData();
     const userId = interaction.user.id;
-    
-    // Initialize user data if doesn't exist
-    if (!skinData[userId]) {
-      skinData[userId] = {
-        totalLegendary: 0,
-        skins: [],
-        lastUnbox: 0
-      };
+    await interaction.deferReply();
+
+    if (subcommand === 'add') {
+      return handleAddSkin(interaction, userId);
     }
-    
+
+    const skinData = await skins.read();
     switch (subcommand) {
-      case 'add':
-        await handleAddSkin(interaction, skinData, userId);
-        break;
       case 'count':
         await handleShowCount(interaction, skinData);
         break;
@@ -86,22 +57,13 @@ const command = {
         await handleLeaderboard(interaction, skinData);
         break;
     }
-    
-    await saveSkinData(skinData);
   },
 };
 
 // Handle adding a skin
-const handleAddSkin = async (interaction, skinData, userId) => {
-  const skinName = interaction.options.getString('skin') || `Legendary Skin #${skinData[userId].totalLegendary + 1}`;
-  
-  // Add skin to user's collection
-  skinData[userId].totalLegendary += 1;
-  skinData[userId].skins.push({
-    name: skinName,
-    unboxedAt: Date.now()
-  });
-  skinData[userId].lastUnbox = Date.now();
+const handleAddSkin = async (interaction, userId) => {
+  // The queued update is on disk before we confirm it to Discord.
+  const { skinName, userData } = await skins.add(userId, interaction.options.getString('skin'));
   
   // Random congratulatory messages
   const messages = [
@@ -119,14 +81,14 @@ const handleAddSkin = async (interaction, skinData, userId) => {
     .setTitle(randomMessage)
     .setDescription(`**${skinName}** has been added to your collection!`)
     .addFields(
-      { name: '🏆 Total Legendary Skins', value: `${skinData[userId].totalLegendary}`, inline: true },
+      { name: '🏆 Total Legendary Skins', value: `${userData.totalLegendary}`, inline: true },
       { name: '📅 Unboxed', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
     )
     .setThumbnail('https://i.imgur.com/YourLegendaryIcon.png') // You can add a PUBG legendary icon URL
     .setFooter({ text: 'PUBG Legendary Skin Tracker' })
     .setTimestamp();
   
-  await interaction.reply({ embeds: [embed] });
+  await interaction.editReply({ embeds: [embed] });
 };
 
 // Handle showing count
@@ -134,11 +96,7 @@ const handleShowCount = async (interaction, skinData) => {
   const targetUser = interaction.options.getUser('user') || interaction.user;
   const targetId = targetUser.id;
   
-  if (!skinData[targetId]) {
-    skinData[targetId] = { totalLegendary: 0, skins: [], lastUnbox: 0 };
-  }
-  
-  const userData = skinData[targetId];
+  const userData = skinData[targetId] || emptyCollection();
   const lastUnbox = userData.lastUnbox ? `<t:${Math.floor(userData.lastUnbox / 1000)}:R>` : 'Never';
   
   const embed = new EmbedBuilder()
@@ -153,15 +111,15 @@ const handleShowCount = async (interaction, skinData) => {
     .setFooter({ text: 'PUBG Legendary Skin Tracker' })
     .setTimestamp();
   
-  await interaction.reply({ embeds: [embed] });
+  await interaction.editReply({ embeds: [embed] });
 };
 
 // Handle listing all skins
 const handleListSkins = async (interaction, skinData, userId) => {
-  const userData = skinData[userId];
+  const userData = skinData[userId] || emptyCollection();
   
   if (userData.skins.length === 0) {
-    return interaction.reply('📦 You haven\'t unboxed any legendary skins yet! Use `/lege add` when you get one!');
+    return interaction.editReply('📦 You haven\'t unboxed any legendary skins yet! Use `/lege add` when you get one!');
   }
   
   const skinsPerPage = 10;
@@ -185,7 +143,7 @@ const handleListSkins = async (interaction, skinData, userId) => {
     .setFooter({ text: 'PUBG Legendary Skin Collection' })
     .setTimestamp();
   
-  await interaction.reply({ embeds: [embed] });
+  await interaction.editReply({ embeds: [embed] });
 };
 
 // Handle leaderboard
@@ -195,7 +153,7 @@ const handleLeaderboard = async (interaction, skinData) => {
     .slice(0, 10);
   
   if (sortedUsers.length === 0) {
-    return interaction.reply('📊 No legendary skins have been unboxed yet!');
+    return interaction.editReply('📊 No legendary skins have been unboxed yet!');
   }
   
   let leaderboard = '';
@@ -218,7 +176,7 @@ const handleLeaderboard = async (interaction, skinData) => {
     .setFooter({ text: 'Who\'s the luckiest unboxer?' })
     .setTimestamp();
   
-  await interaction.reply({ embeds: [embed] });
+  await interaction.editReply({ embeds: [embed] });
 };
 
 export default command;
