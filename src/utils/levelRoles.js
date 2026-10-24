@@ -15,7 +15,9 @@ export const syncLevelRole = (member) => {
     // Add before removing: a permissions failure must not remove the previous reward.
     if (!member.roles.cache.has(role.id)) await member.roles.add(role);
     const oldRoles = member.roles.cache.filter(r => Object.values(LEVEL_ROLES).includes(r.name) && r.id !== role.id);
-    if (oldRoles.size) await member.roles.remove(oldRoles);
+    // Collection removal replaces the role list using a potentially stale Gateway
+    // cache. Individual DELETEs preserve the new role and concurrent role grants.
+    for (const oldRole of oldRoles.values()) await member.roles.remove(oldRole.id);
   }).catch(error => { console.error('Error assigning level role:', error); });
   queues.set(guild.id, task);
   void task.then(() => { if (queues.get(guild.id) === task) queues.delete(guild.id); });

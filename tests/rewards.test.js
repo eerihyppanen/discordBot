@@ -127,9 +127,9 @@ test('Colonist rewards synchronize roles immediately and concurrent role updates
   } };
   const assigned = new Collection([['old', { id: 'old', name: 'Jumping-Noob' }]]);
   const member = { id: winner.id, guild, roles: {
-    cache: assigned,
+    cache: new Collection(assigned), // Gateway cache remains stale after REST calls.
     add: async role => { assigned.set(role.id, role); },
-    remove: async old => { for (const role of old.values()) assigned.delete(role.id); },
+    remove: async id => { assigned.delete(id); },
   } };
   await addXP(winner.id, 2450);
   const request = makeRequest();
