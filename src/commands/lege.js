@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import { skins, emptyCollection } from '../utils/skinSystem.js';
+import { skins, emptyCollection, MAX_SKIN_NAME_LENGTH, validateSkinName } from '../utils/skinSystem.js';
+import { truncateText } from '../utils/text.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -12,6 +13,8 @@ const command = {
         .addStringOption(option =>
           option.setName('skin')
             .setDescription('Name of the legendary skin (optional)')
+            .setMinLength(1)
+            .setMaxLength(MAX_SKIN_NAME_LENGTH)
             .setRequired(false)
         )
     )
@@ -62,8 +65,11 @@ const command = {
 
 // Handle adding a skin
 const handleAddSkin = async (interaction, userId) => {
+  let name;
+  try { name = validateSkinName(interaction.options.getString('skin')); }
+  catch (error) { return interaction.editReply(`❌ ${error.message}`); }
   // The queued update is on disk before we confirm it to Discord.
-  const { skinName, userData } = await skins.add(userId, interaction.options.getString('skin'));
+  const { skinName, userData } = await skins.add(userId, name);
   
   // Random congratulatory messages
   const messages = [
@@ -105,7 +111,7 @@ const handleShowCount = async (interaction, skinData) => {
     .setThumbnail(targetUser.displayAvatarURL())
     .addFields(
       { name: '🏆 Total Legendary Skins', value: `${userData.totalLegendary}`, inline: true },
-      { name: '📦 Recent Skins', value: `${userData.skins.slice(-3).map(s => s.name).join('\n') || 'None'}`, inline: true },
+      { name: '📦 Recent Skins', value: userData.skins.slice(-3).map(s => truncateText(s.name, MAX_SKIN_NAME_LENGTH)).join('\n') || 'None', inline: true },
       { name: '⏰ Last Unboxed', value: lastUnbox, inline: true }
     )
     .setFooter({ text: 'PUBG Legendary Skin Tracker' })
@@ -129,7 +135,7 @@ const handleListSkins = async (interaction, skinData, userId) => {
   
   const skinList = currentSkins.map((skin, index) => {
     const unboxTime = `<t:${Math.floor(skin.unboxedAt / 1000)}:d>`;
-    return `**${skins.length - index}.** ${skin.name} - ${unboxTime}`;
+    return `**${skins.length - index}.** ${truncateText(skin.name, MAX_SKIN_NAME_LENGTH)} - ${unboxTime}`;
   }).join('\n');
   
   const embed = new EmbedBuilder()

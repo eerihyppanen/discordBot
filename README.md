@@ -79,7 +79,7 @@ You can now run the code in the repository using the command line by typing the 
 
 ## Running and updating this bot
 
-Use Node.js 18 or newer and install the locked dependencies with `npm ci`.
+Use Node.js 24 LTS (`nvm use`) and install the locked dependencies with `npm ci`.
 Copy `.env-sample` to `.env` and set `TOKEN`, `CLIENT_ID`, and `GUILD_ID`.
 The game and AI commands also need their corresponding API keys.
 
@@ -87,6 +87,8 @@ The game and AI commands also need their corresponding API keys.
 - Run `npm run deploy-commands` after updating slash command definitions. In particular,
   `/pubg-wins-add` now requires **Manage Server** both in its default command permissions
   and when it executes. Successful manual edits log the actor and changed values.
+- Re-register commands after this update: `/colonist win` now requires `winner` and
+  `match`, `/pubg-wins-add` no longer accepts `region`, and text inputs have length limits.
 - `/pubg <username>` and `/pubg-wins <username>` search Steam PC players only.
   Re-register the commands to remove their old platform and region options.
   Command registration validates the entire command set before replacing it in Discord;
@@ -98,8 +100,9 @@ The game and AI commands also need their corresponding API keys.
 ### Persistent data and shutdown
 
 `DATA_DIR` defaults to `data` in the working directory. Existing `economy.json`,
-`userLevels.json`, `pubgWins.json`, `colonistWins.json`, and `pubgSkins.json` files keep their current formats.
-No data-format migration is needed. Economy updates share a queue and are written before success is
+`userLevels.json`, `colonistWins.json`, and `pubgSkins.json` retain their user records.
+XP and economy records gain cooldown and reward-receipt fields. PUBG player keys are migrated as
+described below. Economy updates share a queue and are written before success is
 reported. Every JSON write uses a temporary file and atomic replacement; malformed or
 unreadable data is reported instead of silently resetting users.
 
@@ -115,13 +118,64 @@ Docker. For example, mount a volume at `/data` and set `DATA_DIR=/data`. Back up
 folder before deploying. Run **one bot process per data directory**: the write queue is
 within a process, so replicas must not share these JSON files.
 
-XP, PUBG wins, and Colonist statistics still batch writes for up to five minutes to reduce
-SD-card writes. XP leaderboards and level checks for existing users read the shared in-memory
+Chat XP, PUBG wins, and unconfirmed Colonist loss statistics batch writes for up to five minutes to reduce
+SD-card writes. Confirmed Colonist wins persist their coins, XP and statistics before success is reported.
+XP leaderboards and level checks for existing users read the shared in-memory
 XP data, including unsaved changes, without extra disk reads or scheduled writes.
 Both `SIGINT` and `SIGTERM` stop accepting new work, flush current state,
 finish in-flight commands, flush again, and then disconnect Discord. Shutdown has an eight-second
 deadline and exits with failure if a save fails or the deadline is exceeded. A hard kill
 or power failure can still lose stats that have not reached the five-minute save.
+
+### Rewards and levels
+
+Server messages earn 15 XP at most once per user per 60 seconds, shared across channels
+and servers. Bot messages, webhooks and DMs do not earn XP. A reward can cross several
+level thresholds at once. Both chat XP and confirmed Colonist wins synchronize the
+winner's level role; a later eligible message retries a missed role update. The bot
+needs Manage Roles and a role above the level rewards in the server hierarchy.
+
+To confirm a Colonist win, a different member with **Manage Server** uses:
+
+```text
+/colonist win winner:@Player match:game-123456
+```
+
+Use the actual unique match ID (6–100 letters, numbers, underscores or hyphens), not
+a reusable room code. Confirmation is a moderator's attestation, not an automatic
+lookup against the Colonist service. Moderators cannot confirm their own wins.
+The winner must be a human member of that server and can receive one confirmed win
+per 30 minutes. Match IDs are case-insensitive and cannot reward another winner or
+be reused across servers. `/colonist loss` still records your own losses.
+
+If confirmation fails, retry with the **same match ID**. A durable coin receipt and
+per-match XP/stat markers prevent duplicate payouts and allow startup to finish an
+interrupted award. Finish a pending award before recording that player's next result.
+Back up and restore the entire data directory together, not individual reward files.
+Dice winnings now return 1.8 times the stake in total: a 100-coin winning bet increases
+the balance by 80 coins. A sum of 7 loses.
+
+### PUBG player-key migration
+
+PUBG records now use the same normalized username and platform for API lookups and
+manual updates; region no longer creates a separate leaderboard entry. At startup,
+legacy regional duplicates are merged using the most recent `lastUpdated` snapshot.
+Win counts are **not summed**, since snapshots can contain the same matches. Equal
+timestamps prefer an already canonical entry, otherwise a deterministic key order.
+Platforms remain separate. A username change is not automatically linked to an old name.
+
+Before replacing any keys, the bot saves the entire original file beside it as
+`pubgWins.json.before-player-keys-<unique-id>.bak`. A backup failure stops migration.
+Keep this backup to review older or conflicting manual values. The new file retains
+one record per username/platform, and subsequent startups do not migrate it again.
+
+### Text and FACEIT commands
+
+New skin names are limited to 100 characters and validated before saving. Existing
+long names are shortened only for display; saved collections remain intact. `/8ball`
+questions are limited to 1024 characters. FACEIT reads the player profile and the
+separate CS2/CSGO lifetime-statistics endpoint, preserves zero values, and reports
+authentication, rate-limit, timeout and missing-player errors separately.
 
 ### Reminders
 

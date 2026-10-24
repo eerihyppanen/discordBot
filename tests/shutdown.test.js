@@ -34,7 +34,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     assert.equal(terminatedBy, null);
     const read = async (name) => JSON.parse(await fs.readFile(path.join(dir, name), 'utf8'));
     assert.equal((await read('userLevels.json')).user.xp, 75);
-    assert.equal((await read('pubgWins.json'))['player_steam_pc-eu'].wins, 2);
+    assert.equal((await read('pubgWins.json'))['player_steam'].wins, 2);
     assert.equal((await read('colonistWins.json')).user.wins, 1);
     assert.equal((await read('economy.json')).user.coins, 125);
     assert.equal(Object.values(await read('reminders.json'))[0].message, 'pending');
