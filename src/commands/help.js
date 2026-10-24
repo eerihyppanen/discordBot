@@ -42,11 +42,11 @@ const showGeneralHelp = async (interaction) => {
       {
         name: '🎲 Colonist.io Tracker',
         value: [
-          '`/colonist win` - Record a win (earn XP & coins!)',
+          '`/colonist win winner:<user> match:<id>` - Moderator confirms another player’s win',
           '`/colonist loss` - Record a loss (resets streak)',
           '`/colonist stats [user]` - View your statistics',
           '`/colonist-leaderboard [type]` - View win/streak leaderboards',
-          '*Win streaks give bonus rewards every 3 wins!*'
+          '*Confirmed wins: once per player per 30 minutes. Match IDs cannot be reused.*'
         ].join('\n'),
         inline: false
       },
@@ -72,7 +72,7 @@ const showGeneralHelp = async (interaction) => {
         value: [
           '`/level [user]` - Check your level and XP',
           '`/leaderboard` - Show top 10 users by level',
-          '*Gain XP by sending messages!*'
+          '*Gain 15 XP from a server message once every 60 seconds.*'
         ].join('\n'),
         inline: false
       },
@@ -143,6 +143,13 @@ const showSpecificHelp = async (interaction, commandName) => {
 
 const getCommandDetails = (commandName) => {
   const commands = {
+    'colonist': {
+      description: 'Track Colonist results with confirmed rewards',
+      usage: '/colonist win winner:<user> match:<id> | /colonist loss | /colonist stats [user]',
+      parameters: '`winner` - Another human server member\n`match` - Unique game ID (6–100 letters, numbers, underscores or hyphens)',
+      examples: '/colonist win winner:@Player match:game-123456\n/colonist stats',
+      notes: 'Confirming wins requires Manage Server. You cannot confirm your own win. Rewards are limited to one win per player per 30 minutes. Retry failed confirmations with the same match ID.'
+    },
     'faceit': {
       description: 'Check FACEIT stats for CS2/CSGO players',
       usage: '/faceit <username>',
@@ -217,7 +224,7 @@ const getCommandDetails = (commandName) => {
       usage: '/gamble <game> <amount> [choice]',
       parameters: '`coinflip` - Double or nothing coin flip\n`slots` - Slot machine with multipliers\n`dice` - High/low dice betting',
       examples: '/gamble coinflip 50 heads\n/gamble slots 100\n/gamble dice 200 high',
-      notes: '🎰 Coinflip: 2x payout | Slots: up to 10x | Dice: 1.8x payout'
+      notes: '🎰 Coinflip: 2x total payout | Slots: up to 10x | Dice: 1.8x total payout (0.8x net profit). A dice sum of 7 loses.'
     },
     'remind': {
       description: 'Set a reminder for yourself',

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "this is a demo project for teaching how to build a discord bot",
   "type": "module",
+  "engines": { "node": ">=24 <25" },
   "scripts": {
     "build": "rm -rf build && esbuild src/*.js src/**/*.js --platform=node --format=esm --outdir=build --outbase=src",
     "start": "npm run build && node -r dotenv/config build/app.js",
@@ -22,15 +23,11 @@
   "license": "MIT",
   "dependencies": {
     "ascii-table": "^0.0.9",
-    "axios": "^1.20.0",
     "discord.js": "^14.27.0"
   },
   "devDependencies": {
-    "chai": "^4.3.6",
     "dotenv": "^16.0.2",
-    "esbuild": "^0.24.2",
-    "esbuild-runner": "^2.2.1",
-    "mocha": "^10.0.0",
+    "esbuild": "^0.28.2",
     "nodemon": "^3.1.9"
   }
 }

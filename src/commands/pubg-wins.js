@@ -92,7 +92,7 @@ const command = {
       const avgDamage = totalMatches > 0 ? Math.round(damageDealt / totalMatches) : 0;
       
       // Update tracked stats
-      await updatePlayerWins(username, platform, shard, totalWins, totalMatches, parseFloat(winRate));
+      await updatePlayerWins(player.attributes.name, platform, shard, totalWins, totalMatches, parseFloat(winRate));
       
       const embed = new EmbedBuilder()
         .setColor('#FFD700')

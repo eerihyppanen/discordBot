@@ -1,6 +1,8 @@
 import { createJsonStore, dataFile } from './jsonStore.js';
 
 export const createEconomySystem = (store) => {
+  const findReward = (users, matchId) => Object.values(users)
+    .map(user => user.colonistRewards?.[matchId]).find(Boolean);
   const updateUser = (userId, mutate) => store.update((economy) => {
     economy[userId] ??= { coins: 100, bank: 0, lastDaily: 0 };
     return mutate(economy[userId]);
@@ -16,6 +18,19 @@ export const createEconomySystem = (store) => {
     },
     addCoins: (userId, amount) => updateUser(userId, (user) => {
       user.coins += amount;
+      return user.coins;
+    }),
+    getColonistReward: async (matchId) => findReward(await store.read(), matchId),
+    getColonistRewards: async () => Object.values(await store.read())
+      .flatMap(user => Object.values(user.colonistRewards || {})),
+    grantColonistReward: (receipt) => store.update(users => {
+      const previous = findReward(users, receipt.matchId);
+      if (previous && previous.userId !== receipt.userId) throw new Error('This match already has a different winner.');
+      const user = users[receipt.userId] ??= { coins: 100, bank: 0, lastDaily: 0 };
+      if (!previous) {
+        user.coins += receipt.coinReward;
+        (user.colonistRewards ??= {})[receipt.matchId] = receipt;
+      }
       return user.coins;
     }),
     claimDaily: (userId, { now = Date.now(), reward = Math.floor(Math.random() * 500) + 100 } = {}) =>

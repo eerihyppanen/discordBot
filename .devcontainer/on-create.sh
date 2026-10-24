@@ -1,2 +1,5 @@
-cp /workspaces/memebot_discord/.env-sample /workspaces/memebot_discord/.env
-npm install
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+if [ ! -f .env ]; then cp .env-sample .env; fi
+npm ci

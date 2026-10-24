@@ -196,7 +196,8 @@ const handleDice = (interaction, economy, userId, amount) => {
   const diceEmoji = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
   
   if (won) {
-    economy[userId].coins += Math.floor(amount * 1.8); // 1.8x multiplier
+    const netWinnings = Math.floor(amount * 1.8) - amount;
+    economy[userId].coins += netWinnings;
     const embed = new EmbedBuilder()
       .setColor('#00ff00')
       .setTitle('🎲 Dice Winner! 🎲')
@@ -204,7 +205,7 @@ const handleDice = (interaction, economy, userId, amount) => {
         { name: 'Your Guess', value: guess.charAt(0).toUpperCase() + guess.slice(1), inline: true },
         { name: 'Dice Roll', value: `${diceEmoji[dice1-1]} ${diceEmoji[dice2-1]}`, inline: true },
         { name: 'Sum', value: `${sum}`, inline: true },
-        { name: 'Winnings', value: `+${Math.floor(amount * 1.8)} coins`, inline: true },
+        { name: 'Net Winnings', value: `+${netWinnings} coins`, inline: true },
         { name: 'New Balance', value: `${economy[userId].coins} coins`, inline: false }
       )
       .setTimestamp();
