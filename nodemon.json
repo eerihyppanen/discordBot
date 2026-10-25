@@ -1,5 +1,7 @@
 {
-    "watch": ["src"],
-    "ignore": ["src/**/*.test.ts", "node_modules"],
-    "ext": "js"
+  "watch": [
+    "src"
+  ],
+  "ext": "js",
+  "exec": "node -r dotenv/config src/app.js"
 }

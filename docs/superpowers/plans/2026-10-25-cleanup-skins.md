@@ -1,6 +1,6 @@
 # Bot Cleanup and Skin Browsing Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Complete the user's five cleanup requests and add safe skin undo and browsing.
 **Architecture:** Keep the existing JSON stores and command registry; add a focused skin component handler and derive help from real command definitions.
@@ -47,8 +47,17 @@
 **Files:** package.json/package-lock.json, unused source files, Dockerfile, .dockerignore, .nvmrc, nodemon.json, .devcontainer/*, .github/workflows/*, README.md.
 **Interfaces:** npm test/build/start/dev/deploy-commands remain supported; Node 24 is the runtime floor.
 
-- [ ] Remove confirmed unused files and packages; use frozen dependency installation for verification.
-- [ ] Update Node and release actions; make devcontainer setup preserve an existing .env and use the checkout's real path.
-- [ ] Replace template documentation with accurate commands, deployment, DATA_DIR and migration notes.
-- [ ] Run npm ci, all tests, build, dependency audit and diff checks. Check Docker availability; report a build as unrun if unavailable.
-- [ ] Review the completed diff, address material findings and commit.
+- [x] Remove confirmed unused files and packages; use frozen dependency installation for verification.
+- [x] Update Node and release actions; make devcontainer setup preserve an existing .env and use the checkout's real path.
+- [x] Replace template documentation with accurate commands, deployment, DATA_DIR and migration notes.
+- [x] Run npm ci, all tests, build, dependency audit and diff checks. Check Docker availability; report a build as unrun if unavailable.
+- [x] Review the completed diff, address material findings and commit.
+
+## Completion evidence
+
+- Task 1: completed in b40b0d9; new help/PC tests were observed failing and then passing; full suite 65/65.
+- Task 2: completed in 8aa1eb6; undo/navigation tests were observed failing and then passing; full suite 74/74.
+- Task 3: devcontainer path/preservation tests were observed failing and then passing; frozen install and full suite 76/76; build passed; production audit 0 findings.
+- Production Docker image built with verified TLS and a temporary CA secret. An in-container smoke check loaded all 17 commands and exercised persisted skins, undo, page buttons, dispatch and generated help using production dependencies only.
+- Remote release tags verified from the upstream action repositories. The devcontainer image tag was selected from the Microsoft Container Registry tag list after the old-generation tag was confirmed unavailable.
+- Fresh read-only review found no actionable defects. Its scope limits were arbitrary repair of individually malformed legacy records, future registries over 25 commands, and live provider/API behavior. These are outside the requested cleanup; existing valid formats and all current 17 commands are covered. No live Discord registration or image publication was performed.

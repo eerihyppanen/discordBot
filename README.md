@@ -1,133 +1,146 @@
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=542440024)
+# Discord Bot
 
-# Javascript Discord Welcome MemeBot with GitHub Codespaces
+A Discord bot for a gaming community: PUBG Steam PC statistics, Colonist results,
+legendary skin collections, XP and roles, virtual coins, reminders, and Groq chat.
 
-<img src="https://octodex.github.com/images/Robotocat.png" alt="image of robotocat" width="200" style="border:100px solid black"/>
+## Development
 
-Customize and deploy your own welcome memebot for your Discord server! 
+Use **Node.js 24** (`nvm use` reads `.nvmrc`) and install the locked dependencies:
 
-This template repository has all the code you need, with a preconfigured Codespaces development environment, to send a welcome message along with a meme when a user joins your Discord server.
+```sh
+npm ci
+cp .env-sample .env  # only if you do not already have a .env
+```
 
-## How to customize your bot
-<img src="https://octodex.github.com/images/manufacturetocat.png" alt="image of manufacturetocat" width="200"/>
+Fill in the settings locally or inject them through your hosting platform.
+Keep credentials out of Git and do not share `.env`.
 
-### Step 1: Add a .env file
-This template repository requires a `.env` file to pass variables to your application. The `.env` file is used to store data that you want to keep private or hidden like API keys or tokens from external services like Discord. 
+| Variable | Used for |
+| --- | --- |
+| `TOKEN` | Required Discord bot token |
+| `CLIENT_ID`, `GUILD_ID` | Required when registering slash commands |
+| `DATA_DIR` | Persistent JSON directory; defaults to `data` in the working directory |
+| `PUBG_API_KEY` | PUBG commands |
+| `FACEIT_API_KEY` | FACEIT command |
+| `GROQ_API_KEY` | Groq chat |
+| `GROQ_MODEL` | Optional model selection; defaults to `openai/gpt-oss-20b` |
+| `CHANNEL_NAME` | Optional welcome channel name |
+| `MEME_URL` | Optional image for customizing welcome messages |
 
-This template repository has a sample .env file, `.env-sample`, that you can rename to `.env` or copy and paste the variables in `.env-sample` into a new `.env` file. 
+```sh
+npm test                 # local regression suite, no live API keys needed
+npm run build            # compile source into build/
+npm run dev              # reload source changes with nodemon and load .env
+npm start                # build, load .env and connect the bot
+npm run prod             # run an existing build using injected variables
+```
 
-### Step 2: Add your favorite meme
-In your `.env` file you will find a variable named `MEME_URL` where you can add a URL to your favorite meme. 
+The devcontainer uses Node 24 and runs `npm ci`. It copies `.env-sample` only when
+`.env` is absent, so reopening a checkout preserves local configuration.
 
-### Step 3: Add a personalized welcome message
-In the `src` directory you will find another directory called `events`. Open the `events` directory and you will find the `guildMemberAdd.js` file. You'll notice that we left helpful comments on where you can update the code to your liking.
+## Discord configuration and command registration
 
-To add a welcome message, you can update the `getWelcomeMessage` function after the `content:` keyword.
+Create a Discord application and bot, and invite it with the `bot` and
+`applications.commands` scopes. Enable Server Members and Message Content intents
+for welcomes and message XP. Grant the channels used by the bot Send Messages and
+Embed Links; level role management also requires Manage Roles and a suitable bot
+role position.
 
-![code block of get welcome message function](https://user-images.githubusercontent.com/10368374/199597840-dd83efa6-8251-4def-868f-cdadb0df6f02.png)
+After changing command definitions, register them for your development server:
 
-### Step 4 (optional): Customize even further
-Maybe you want to use an API service to provide random memes or maybe you don't want to share a meme at all. No matter what route you choose, you should take this Discord bot and make it your own. :smiley:
+```sh
+npm run deploy-commands
+```
 
-We recommend [creating a new branch](https://docs.github.com/en/desktop/contributing-and-collaborating-using-github-desktop/making-changes-in-a-branch/managing-branches#creating-a-branch) anytime you tinker so you don't have to worry about making mistakes on your main branch. Once your new branch is in a good state, you can [merge your changes](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/about-pull-request-merges) to your main branch using a pull request. :rocket:
+This requires `TOKEN`, `CLIENT_ID`, and `GUILD_ID`. Every command is validated before
+Discord's existing command list is replaced. A failed import, invalid definition,
+or API request exits with failure. The legacy `node deploy-commands.js` entry point
+runs the same implementation. Registration changes Discord server configuration;
+normal builds and tests do not register commands.
 
-## How to deploy your bot
+## Commands
 
-<img src="https://octodex.github.com/images/jetpacktocat.png" alt="image of jetpacktocat" width="200"/>
+`/help` lists the commands actually loaded by the bot. `/help command:lege` shows
+current subcommands, required and optional parameters, and available choices.
 
-### Step 1: Create a new application on Discord
-Visit https://discord.com/developers/applications to create a new application on Discord. Once there, click the `new application` button. After you click on the `new application` button, you can then create a new application (Note: That we created a new application called `Bot Developer`):
+| Area | Commands |
+| --- | --- |
+| PUBG Steam PC | `/pubg username`, `/pubg-wins username`, `/pubg-leaderboard` |
+| Manual PUBG statistics | `/pubg-wins-add username wins matches` (Manage Server required) |
+| Other games | `/faceit username`, `/colonist win`, `/colonist loss`, `/colonist stats`, `/colonist-leaderboard` |
+| Legendary skins | `/lege add`, `/lege undo`, `/lege count`, `/lege list`, `/lege leaderboard` |
+| XP | `/level`, `/leaderboard` |
+| Virtual economy | `/balance`, `/daily`, `/gamble coinflip`, `/gamble slots`, `/gamble dice` |
+| Other | `/remind time message`, `/groq message`, `/8ball question`, `/help` |
 
-![Screenshot 2022-10-07 at 1 01 38 PM](https://user-images.githubusercontent.com/11372162/194497650-50b0fd9b-da26-4bd4-b106-5a5016f47842.png)
+PUBG lookups and manual statistics both use Steam PC player records; platform and
+region inputs are no longer required. Recent PUBG statistics cover up to the last
+20 available matches, not lifetime totals.
 
-### Step 2: Open your application
+### Correcting and browsing legendary skins
 
-After creating an application you should see the application under `My applications`. Open your newly created application by clicking on it.
+Use `/lege add skin:Gold AKM` to record a drop. `/lege undo` removes **your most
+recently added skin**, updates the count and last-drop timestamp, and saves the
+change before confirming it. It cannot remove someone else's skin. Repeating undo
+removes the preceding skin; an empty collection reports that there is nothing to undo.
 
-![Screenshot 2022-10-07 at 1 02 12 PM](https://user-images.githubusercontent.com/11372162/194497723-e57931ef-e25c-4d40-ba73-81b09ecd059e.png)
-
-### Step 3: Configure your bot user
-
-Select the Bot settings to edit the details. First, click on reset token to generate a new token that you will use in your `.env` file. Copy the generated token and set the `TOKEN` variable in your `.env` file with your newly generated token.
-
-Select the public bot option if you want your bot to be publically available.
-Select all the Privileged Gateway Intents like PRESENCE INTENT, SERVER MEMBERS INTENT, MESSAGE CONTENT INTENT if your bot needs those intents.(Note: For this application you'll need all of these intents.)
-
-![image](https://user-images.githubusercontent.com/11372162/194498518-e535b2d0-0b64-4d1d-8527-f49314be16cb.png)
-
-### Step 4: Select your bot permissions
-Open the `OAuth2` setting and then select `URL Generator`.
-
-Select the `bot` checkbox under `SCOPES`. After, select `Send Messages`, `Mention Everyone`, and `Add Reactions`. 
-
-Once you have set your bot permissions copy the generated url below.
-
-![image](https://user-images.githubusercontent.com/11372162/194498853-8ba28265-ab65-4df1-9e25-8d8913decfdb.png)
-
-### Step 5: Choose your Discord Server
-Visit the generated url from the previous step and choose the server that you want to add the bot to. Once you've selected the server click continue.
-
-![image](https://user-images.githubusercontent.com/11372162/194499328-3874ccf5-d099-4f83-b62d-af091b06773a.png)
-
-### Step 6: Run your application
-
-Once the bot is added it will appear on your Discord server in offline mode.
-
-You can now run the code in the repository using the command line by typing the command `npm start`. 
-
-
-
-## Running and updating this bot
-
-Use Node.js 18 or newer and install the locked dependencies with `npm ci`.
-Copy `.env-sample` to `.env` and set `TOKEN`, `CLIENT_ID`, and `GUILD_ID`.
-The game and AI commands also need their corresponding API keys.
-
-- Run `npm test` for the regression suite and `npm run build` to compile the bot.
-- Run `npm run deploy-commands` after updating slash command definitions. In particular,
-  `/pubg-wins-add` now requires **Manage Server** both in its default command permissions
-  and when it executes. Successful manual edits log the actor and changed values.
-- `/pubg <username>` and `/pubg-wins <username>` search Steam PC players only.
-  Re-register the commands to remove their old platform and region options.
-  Command registration validates the entire command set before replacing it in Discord;
-  an invalid command or a failed API request exits with failure.
-- `GROQ_MODEL` selects the Groq model; the default is `openai/gpt-oss-20b`.
-  Check [Groq's supported models](https://console.groq.com/docs/models) when changing it.
-  Authentication, model, rate-limit, timeout, and invalid-response errors are reported separately.
-
-### Persistent data and shutdown
-
-`DATA_DIR` defaults to `data` in the working directory. Existing `economy.json`,
-`userLevels.json`, `pubgWins.json`, `colonistWins.json`, and `pubgSkins.json` files keep their current formats.
-No data-format migration is needed. Economy updates share a queue and are written before success is
-reported. Every JSON write uses a temporary file and atomic replacement; malformed or
-unreadable data is reported instead of silently resetting users.
-
-Legendary skins now also use `DATA_DIR`, queued atomic writes, and save-before-confirmation.
-Viewing counts, lists, or leaderboards does not write skin data. If you previously set a
-custom `DATA_DIR`, the old skin command still wrote to `data/pubgSkins.json` in the bot's
-working directory. Stop the bot and back up that file before upgrading, then copy it into
-`DATA_DIR` if no skin file is already present there. If both files exist, reconcile them
-before starting; do not overwrite either collection blindly.
-
-Keep `DATA_DIR` on a persistent disk or volume, including when deploying to Railway or
-Docker. For example, mount a volume at `/data` and set `DATA_DIR=/data`. Back up this
-folder before deploying. Run **one bot process per data directory**: the write queue is
-within a process, so replicas must not share these JSON files.
-
-XP, PUBG wins, and Colonist statistics still batch writes for up to five minutes to reduce
-SD-card writes. XP leaderboards and level checks for existing users read the shared in-memory
-XP data, including unsaved changes, without extra disk reads or scheduled writes.
-Both `SIGINT` and `SIGTERM` stop accepting new work, flush current state,
-finish in-flight commands, flush again, and then disconnect Discord. Shutdown has an eight-second
-deadline and exits with failure if a save fails or the deadline is exceeded. A hard kill
-or power failure can still lose stats that have not reached the five-minute save.
+`/lege list` shows the newest ten skins. Previous/Next buttons browse the remaining
+pages, and only the user who opened the list can navigate it. Buttons read current
+data, so an old page adjusts after an addition or undo. Browsing never writes data.
 
 ### Reminders
 
-Reminders are stored in `reminders.json` before confirmation and checked every 15 seconds.
-Pending and overdue reminders resume when the bot is online again. Delivery first tries
-a DM, then a normal bot message in the original channel, so it does not depend on an old
-interaction token. If both destinations fail, the reminder stays saved and retries with
-backoff. The bot needs permission to send messages and embed links in the fallback channel.
-A crash after sending but before recording completion can cause a duplicate reminder.
+`/remind time:30m message:Check the oven` accepts seconds, minutes, hours, or days,
+up to seven days. Pending reminders persist across restarts. Every 15 seconds the
+bot checks for due reminders, tries a DM, then falls back to the original channel.
+If both fail, it retains the reminder and retries with backoff. A crash after
+sending but before recording completion can cause a duplicate delivery.
+
+## Persistent data and upgrades
+
+Keep `DATA_DIR` on persistent storage and back it up before upgrades. Files retain
+the existing JSON formats: `economy.json`, `userLevels.json`, `pubgWins.json`,
+`colonistWins.json`, `pubgSkins.json`, and `reminders.json`.
+
+Run **one bot process per data directory**; update queues are process-local.
+Writes use temporary files and atomic replacement. Malformed or unreadable JSON
+is reported rather than silently resetting users. Economy, skin changes, and
+reminders are saved before confirmation. XP, PUBG and Colonist statistics batch
+writes for up to five minutes to reduce SD-card writes.
+
+Both `SIGINT` and `SIGTERM` stop new work, flush stores, drain active interactions
+and reminder delivery, flush again, then disconnect. The shutdown deadline is eight
+seconds. Failed saves or timeouts exit with failure. Hard kills or power failures
+can lose batched statistics that have not yet been flushed.
+
+Two compatibility details for older installations:
+
+- Old skin commands ignored custom `DATA_DIR` and wrote to the working directory's
+  `data/pubgSkins.json`. Stop the bot, back up the old file and copy it into
+  `DATA_DIR` if no destination file exists. If both exist, reconcile them before
+  starting; do not overwrite either blindly.
+- Legacy Steam PC-region records resolve to a single Steam record per player,
+  retaining the snapshot with the latest `lastUpdated`. Overlapping recent-match
+  totals are never added together. Reads leave the file intact; the next explicit
+  statistics update saves canonical records. Console records remain preserved.
+
+## Deployment
+
+The Docker image uses Node 24, locked installs and production dependencies only:
+
+```sh
+docker build -t discord-bot .
+docker run --env-file .env -e DATA_DIR=/data -v discord-bot-data:/data discord-bot
+```
+
+Local `.env`, `.git`, data and dependency directories are excluded from the build
+context. In a managed environment with a TLS inspection proxy, supply its CA as a
+BuildKit secret: `docker build --secret id=proxy_ca,src=/path/to/proxy-ca.pem .`.
+The CA is used only in networked installation steps and is not copied into layers.
+
+On Railway, inject the variables and attach persistent storage at `DATA_DIR`.
+The repository's Railway start command runs `node build/app.js`.
+
+CI tests and builds on Node 24. Pushing to `release` runs the tests, builds the
+Docker image and pushes the configured Docker Hub tag; that workflow requires
+`DOCKER_USERNAME` and `DOCKER_ACCESS_TOKEN` repository secrets.

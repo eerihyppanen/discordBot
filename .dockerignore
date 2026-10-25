@@ -2,3 +2,8 @@ node_modules
 npm-debug.log
 build
 .devcontainer
+.git
+.env
+.env.*
+data
+.superpowers
