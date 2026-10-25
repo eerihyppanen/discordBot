@@ -272,3 +272,17 @@ test('a response failure after a saved win does not tell the user to record it a
   assert.equal((await getUserLevel(userId)).xp, 50);
   assert.equal((await economy.getBalance(userId)).coins, 200);
 });
+
+test('manual PUBG changes use the same Steam record as automatic PC lookups', async () => {
+  assert.deepEqual(manual.data.toJSON().options.map(option => option.name), ['username', 'wins', 'matches']);
+  const admin = interaction('pc-moderator', {
+    strings: { username: 'PCPlayer', platform: 'xbox', region: 'console' },
+    integers: { wins: 7, matches: 20 },
+  });
+  admin.memberPermissions.has = () => true;
+  const originalInfo = console.info;
+  console.info = () => {};
+  try { await manual.execute(admin); } finally { console.info = originalInfo; }
+  assert.equal((await getPlayerWins('PCPlayer', 'steam', 'steam')).wins, 7);
+  assert.equal(await getPlayerWins('PCPlayer', 'xbox', 'console'), null);
+});

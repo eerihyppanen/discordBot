@@ -1,25 +1,16 @@
 import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } from "discord.js";
 import { updatePlayerWins } from "../utils/pubgWinsSystem.js";
+import { PUBG_SHARD } from "../utils/pubgClient.js";
 
 const command = {
   data: new SlashCommandBuilder()
     .setName('pubg-wins-add')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .setDescription('Manually add or update PUBG player win statistics')
+    .setDescription('Manually update PUBG Steam PC player win statistics')
     .addStringOption(option =>
       option.setName('username')
         .setDescription('PUBG username')
         .setRequired(true)
-    )
-    .addStringOption(option =>
-      option.setName('platform')
-        .setDescription('Gaming platform')
-        .setRequired(true)
-        .addChoices(
-          { name: 'Steam (PC)', value: 'steam' },
-          { name: 'Xbox', value: 'xbox' },
-          { name: 'PlayStation', value: 'psn' }
-        )
     )
     .addIntegerOption(option =>
       option.setName('wins')
@@ -32,19 +23,6 @@ const command = {
         .setDescription('Total matches played')
         .setRequired(true)
         .setMinValue(1)
-    )
-    .addStringOption(option =>
-      option.setName('region')
-        .setDescription('Server region')
-        .setRequired(false)
-        .addChoices(
-          { name: 'Europe', value: 'pc-eu' },
-          { name: 'North America', value: 'pc-na' },
-          { name: 'Asia', value: 'pc-as' },
-          { name: 'Oceania', value: 'pc-oc' },
-          { name: 'South America', value: 'pc-sa' },
-          { name: 'Console (Global)', value: 'console' }
-        )
     ),
   
   async execute(interaction) {
@@ -53,10 +31,10 @@ const command = {
     }
 
     const username = interaction.options.getString('username');
-    const platform = interaction.options.getString('platform');
+    const platform = 'steam';
     const wins = interaction.options.getInteger('wins');
     const matches = interaction.options.getInteger('matches');
-    const region = interaction.options.getString('region') || 'pc-eu';
+    const region = PUBG_SHARD;
     
     await interaction.deferReply();
     
