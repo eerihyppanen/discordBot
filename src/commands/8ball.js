@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
+import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from "discord.js";
 
 const responses = [
   "It is certain", "It is decidedly so", "Without a doubt", "Yes definitely",
@@ -16,11 +16,16 @@ const command = {
     .addStringOption(option =>
       option.setName('question')
         .setDescription('Your question for the 8-ball')
+        .setMinLength(1)
+        .setMaxLength(1024)
         .setRequired(true)
     ),
   
   async execute(interaction) {
     const question = interaction.options.getString('question');
+    if (typeof question !== 'string' || !question.trim() || question.length > 1024) {
+      return interaction.reply({ content: '❌ Your question must contain 1–1024 characters.', flags: MessageFlags.Ephemeral });
+    }
     const response = responses[Math.floor(Math.random() * responses.length)];
     
     const embed = new EmbedBuilder()

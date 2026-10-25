@@ -10,6 +10,8 @@ const command = {
     .addStringOption(option =>
       option.setName('username')
         .setDescription('PUBG username')
+        .setMinLength(1)
+        .setMaxLength(64)
         .setRequired(true)
     )
     .addIntegerOption(option =>

@@ -79,7 +79,7 @@ region inputs are no longer required. Recent PUBG statistics cover up to the las
 
 ### Correcting and browsing legendary skins
 
-Use `/lege add skin:Gold AKM` to record a drop. `/lege undo` removes **your most
+Use `/lege add skin:Gold AKM` to record a drop (names are limited to 100 characters). `/lege undo` removes **your most
 recently added skin**, updates the count and last-drop timestamp, and saves the
 change before confirming it. It cannot remove someone else's skin. Repeating undo
 removes the preceding skin; an empty collection reports that there is nothing to undo.
@@ -96,17 +96,46 @@ bot checks for due reminders, tries a DM, then falls back to the original channe
 If both fail, it retains the reminder and retries with backoff. A crash after
 sending but before recording completion can cause a duplicate delivery.
 
+## Rewards and levels
+
+Eligible server messages earn 15 XP at most once per user per 60 seconds, shared
+across channels and servers. Bots, webhooks and DMs do not earn XP. Rewards can
+cross multiple level thresholds. Eligible messages and confirmed Colonist wins
+synchronize the member's level role; a later message can retry a missed update.
+
+Colonist wins require another member with **Manage Server** to confirm the winner:
+
+```text
+/colonist win winner:@Player match:game-123456
+```
+
+Use an actual unique match ID (6–100 letters, digits, underscores or hyphens), not
+a reusable room code. This is moderator confirmation, not automatic verification
+with Colonist. Moderators cannot confirm themselves; the winner must be a human
+member of that server and can receive one confirmed win per 30 minutes. Match IDs
+are case-insensitive and cannot be reused for another winner or another server.
+`/colonist loss` records your own loss.
+
+If an award fails, retry with the **same match ID**. Persistent reward receipts
+prevent duplicate payouts and let startup complete interrupted awards. Finish an
+outstanding award before recording the player's next result. Back up and restore
+the entire data directory together, rather than individual reward files.
+
+Dice returns 1.8 times the stake in total: a winning 100-coin bet increases the
+balance by 80 coins. Rolling a sum of seven loses the stake.
+
 ## Persistent data and upgrades
 
-Keep `DATA_DIR` on persistent storage and back it up before upgrades. Files retain
-the existing JSON formats: `economy.json`, `userLevels.json`, `pubgWins.json`,
+Keep `DATA_DIR` on persistent storage and back it up before upgrades. User records
+are retained, with cooldown and reward-receipt fields added as needed. Data files: `economy.json`, `userLevels.json`, `pubgWins.json`,
 `colonistWins.json`, `pubgSkins.json`, and `reminders.json`.
 
 Run **one bot process per data directory**; update queues are process-local.
 Writes use temporary files and atomic replacement. Malformed or unreadable JSON
 is reported rather than silently resetting users. Economy, skin changes, and
-reminders are saved before confirmation. XP, PUBG and Colonist statistics batch
-writes for up to five minutes to reduce SD-card writes.
+reminders are saved before confirmation. Confirmed Colonist wins save their coins,
+XP and statistics before reporting success. Chat XP, PUBG and unconfirmed Colonist
+loss statistics batch writes for up to five minutes to reduce SD-card writes.
 
 Both `SIGINT` and `SIGTERM` stop new work, flush stores, drain active interactions
 and reminder delivery, flush again, then disconnect. The shutdown deadline is eight
@@ -121,8 +150,8 @@ Two compatibility details for older installations:
   starting; do not overwrite either blindly.
 - Legacy Steam PC-region records resolve to a single Steam record per player,
   retaining the snapshot with the latest `lastUpdated`. Overlapping recent-match
-  totals are never added together. Reads leave the file intact; the next explicit
-  statistics update saves canonical records. Console records remain preserved.
+  totals are never added together. Startup migration saves a `.before-player-keys-*.bak`
+  copy of every original row before writing canonical player keys. Console records remain preserved.
 
 ## Deployment
 

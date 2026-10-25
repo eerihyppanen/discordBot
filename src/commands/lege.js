@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import { skins, emptyCollection } from '../utils/skinSystem.js';
+import { skins, emptyCollection, MAX_SKIN_NAME_LENGTH, validateSkinName } from '../utils/skinSystem.js';
 import { renderSkinList, handleSkinButton, displaySkinName } from '../utils/skinList.js';
 
 const command = {
@@ -13,7 +13,8 @@ const command = {
         .addStringOption(option =>
           option.setName('skin')
             .setDescription('Name of the legendary skin (optional)')
-            .setMaxLength(200)
+            .setMinLength(1)
+            .setMaxLength(MAX_SKIN_NAME_LENGTH)
             .setRequired(false)
         )
     )
@@ -74,8 +75,11 @@ const command = {
 
 // Handle adding a skin
 const handleAddSkin = async (interaction, userId) => {
+  let name;
+  try { name = validateSkinName(interaction.options.getString('skin')); }
+  catch (error) { return interaction.editReply(`❌ ${error.message}`); }
   // The queued update is on disk before we confirm it to Discord.
-  const { skinName, userData } = await skins.add(userId, interaction.options.getString('skin'));
+  const { skinName, userData } = await skins.add(userId, name);
   
   // Random congratulatory messages
   const messages = [

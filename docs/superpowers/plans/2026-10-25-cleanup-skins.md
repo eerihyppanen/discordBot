@@ -61,3 +61,15 @@
 - Production Docker image built with verified TLS and a temporary CA secret. An in-container smoke check loaded all 17 commands and exercised persisted skins, undo, page buttons, dispatch and generated help using production dependencies only.
 - Remote release tags verified from the upstream action repositories. The devcontainer image tag was selected from the Microsoft Container Registry tag list after the old-generation tag was confirmed unavailable.
 - Fresh read-only review found no actionable defects. Its scope limits were arbitrary repair of individually malformed legacy records, future registries over 25 commands, and live provider/API behavior. These are outside the requested cleanup; existing valid formats and all current 17 commands are covered. No live Discord registration or image publication was performed.
+
+## Main-branch integration
+
+A final remote check discovered main had advanced to 8b13bea (reward integrity,
+role synchronization, input validation, platform-based PUBG migration and Node24).
+Merged it rather than replacing or resetting those changes. Retained upstream
+pubgWinsSystem.js and its migration backups exactly, added only Steam-only manual
+command options, and retained upstream MAX_SKIN_NAME_LENGTH=100 validation with
+skin undo/navigation. Updated the two new migration assertions to the existing
+main contract and documented its backup behavior. Kept upstream esbuild ^0.28.2
+and all upstream tests. Post-merge frozen install and all 104 tests pass; build
+passes; full npm audit (including development dependencies) reports 0 findings.

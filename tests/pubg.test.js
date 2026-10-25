@@ -55,7 +55,7 @@ for (const command of [pubg, wins]) {
       assert.equal(reply.fields.find(field => field.name === 'Platform').value, 'STEAM');
       assert.equal(reply.fields.find(field => field.name === 'Kills').value, '3');
     } else {
-      const saved = await getPlayerWins('Player & Other', 'steam', 'steam');
+      const saved = await getPlayerWins('Player', 'steam', 'steam');
       assert.equal(saved.wins, 1);
       assert.equal(saved.totalMatches, 1);
       assert.equal(await getPlayerWins('Player & Other', 'xbox', 'console'), null);

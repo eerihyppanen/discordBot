@@ -16,7 +16,7 @@ const { default: remind, parseTime } = await import('../src/commands/remind.js')
 const { default: groq } = await import('../src/commands/groq-chat.js');
 const { economy } = await import('../src/utils/economySystem.js');
 const { flushPubgWinsData, getPlayerWins } = await import('../src/utils/pubgWinsSystem.js');
-const { flushColonistData, getPlayerStats, addLoss } = await import('../src/utils/colonistSystem.js');
+const { flushColonistData, getPlayerStats, addLoss, recordWinWithRewards } = await import('../src/utils/colonistSystem.js');
 const { flushLevelingData, getUserLevel, addXP } = await import('../src/utils/levelingSystem.js');
 
 after(async () => {
@@ -25,15 +25,17 @@ after(async () => {
 });
 
 const interaction = (userId, { strings = {}, integers = {}, subcommand } = {}) => ({
-  user: { id: userId, username: userId, displayAvatarURL: () => 'https://example.com/avatar.png' },
+  user: { id: subcommand === 'win' ? 'moderator' : userId, username: userId, displayAvatarURL: () => 'https://example.com/avatar.png' },
   guildId: 'guild',
+  guild: { members: { fetch: async id => ({ id }) } },
   channelId: 'channel',
   inGuild: () => true,
-  memberPermissions: { has: () => false },
+  memberPermissions: { has: () => subcommand === 'win' },
   options: {
-    getString: (key) => strings[key] ?? null,
+    getString: (key) => strings[key] ?? (subcommand === 'win' && key === 'match' ? userId + '-match' : null),
     getInteger: (key) => integers[key] ?? null,
-    getUser: () => null,
+    getUser: (key) => subcommand === 'win' && key === 'winner'
+      ? { id: userId, username: userId, displayAvatarURL: () => 'https://example.com/avatar.png' } : null,
     getSubcommand: () => subcommand,
   },
   reply: async () => {},
@@ -184,7 +186,7 @@ test('failed Colonist coin writes leave no win or XP and a retry grants rewards 
   const request = interaction(userId, { subcommand: 'win' });
   request.editReply = async (value) => { response = value; };
   await withFailedEconomyWrite(() => quietlyRecordWin(request));
-  assert.match(response, /Error recording win/);
+  assert.match(response, /Retry with the same match ID/);
   assert.equal(await getPlayerStats(userId), null);
   assert.equal((await getUserLevel(userId)).xp, 0);
   assert.equal((await economy.getBalance(userId)).coins, 100);
@@ -206,8 +208,8 @@ test('failed Colonist coin writes leave no win or XP and a retry grants rewards 
 test('failed Colonist rewards preserve an existing streak and its next bonus', async () => {
   const userId = 'colonist-streak-user';
   const request = interaction(userId, { subcommand: 'win' });
-  await colonist.execute(request);
-  await colonist.execute(request);
+  await recordWinWithRewards(userId, userId, { matchId: 'streak-first', confirmedBy: 'moderator', guildId: 'guild', now: Date.now() - 62 * 60_000 });
+  await recordWinWithRewards(userId, userId, { matchId: 'streak-second', confirmedBy: 'moderator', guildId: 'guild', now: Date.now() - 31 * 60_000 });
   await addXP(userId, 250);
   const before = await getPlayerStats(userId);
   const beforeXP = await getUserLevel(userId);
@@ -230,12 +232,12 @@ test('failed Colonist rewards preserve an existing streak and its next bonus', a
 test('a failed win preserves concurrent message XP and a queued loss', async () => {
   const userId = 'colonist-concurrent-user';
   await economy.getBalance(userId);
-  const originalAddCoins = economy.addCoins;
+  const originalGrant = economy.grantColonistReward;
   let entered;
   let release;
   const waiting = new Promise((resolve) => { entered = resolve; });
   const gate = new Promise((resolve) => { release = resolve; });
-  economy.addCoins = async (...args) => { entered(); await gate; return originalAddCoins(...args); };
+  economy.grantColonistReward = async (...args) => { entered(); await gate; return originalGrant(...args); };
   try {
     await withFailedEconomyWrite(async () => {
       const win = quietlyRecordWin(interaction(userId, { subcommand: 'win' }));
@@ -247,7 +249,7 @@ test('a failed win preserves concurrent message XP and a queued loss', async () 
     });
   } finally {
     release();
-    economy.addCoins = originalAddCoins;
+    economy.grantColonistReward = originalGrant;
   }
   const stats = await getPlayerStats(userId);
   assert.equal(stats.wins, 0);

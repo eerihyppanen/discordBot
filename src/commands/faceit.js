@@ -1,4 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
+import { getFaceitStats, faceitErrorMessage } from '../utils/faceitClient.js';
+import { truncateText } from '../utils/text.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -7,6 +9,8 @@ const command = {
     .addStringOption(option =>
       option.setName('username')
         .setDescription('FACEIT username to lookup')
+        .setMinLength(1)
+        .setMaxLength(50)
         .setRequired(true)
     ),
   
@@ -14,6 +18,9 @@ const command = {
     const username = interaction.options.getString('username');
     
     await interaction.deferReply();
+    if (typeof username !== 'string' || !username.trim() || username.length > 50) {
+      return interaction.editReply('❌ Enter a FACEIT username of 1–50 characters.');
+    }
     
     // Check if API key is configured
     if (!process.env.FACEIT_API_KEY || process.env.FACEIT_API_KEY === 'your_faceit_api_key_here') {
@@ -22,43 +29,24 @@ const command = {
     }
     
     try {
-      // Get player data from FACEIT API
-      const playerResponse = await fetch(`https://open.faceit.com/data/v4/players?nickname=${username}`, {
-        headers: {
-          'Authorization': `Bearer ${process.env.FACEIT_API_KEY}`,
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (!playerResponse.ok) {
-        await interaction.editReply('Player not found on FACEIT!');
-        return;
-      }
-      
-      const playerData = await playerResponse.json();
-      
-      // Get CS2 stats
-      const cs2Stats = playerData.games.cs2 || playerData.games.csgo;
-      
-      if (!cs2Stats) {
-        await interaction.editReply('No CS2/CSGO data found for this player!');
-        return;
-      }
+      const { player: playerData, profile: cs2Stats, lifetime, game } = await getFaceitStats(username.trim());
+      const stat = (key, suffix = '') => lifetime[key] == null
+        ? 'N/A' : truncateText(`${lifetime[key]}${suffix}`, 100);
       
       const embed = new EmbedBuilder()
         .setColor(getFaceitLevelColor(cs2Stats.skill_level))
-        .setTitle(`🎯 FACEIT Stats: ${playerData.nickname}`)
-        .setURL(`https://www.faceit.com/en/players/${playerData.nickname}`)
+        .setTitle(`🎯 FACEIT ${game.toUpperCase()} Stats: ${truncateText(playerData.nickname, 80)}`)
+        .setURL(`https://www.faceit.com/en/players/${encodeURIComponent(playerData.nickname)}`)
         .setThumbnail(playerData.avatar || null)
         .addFields(
           { name: 'Level', value: `${cs2Stats.skill_level}`, inline: true },
           { name: 'ELO', value: `${cs2Stats.faceit_elo}`, inline: true },
           { name: 'Country', value: `${playerData.country || 'Unknown'}`, inline: true },
-          { name: 'Matches', value: `${cs2Stats.lifetime?.Matches || 'N/A'}`, inline: true },
-          { name: 'Wins', value: `${cs2Stats.lifetime?.Wins || 'N/A'}`, inline: true },
-          { name: 'Win Rate', value: `${cs2Stats.lifetime?.['Win Rate %'] || 'N/A'}%`, inline: true },
-          { name: 'K/D Ratio', value: `${cs2Stats.lifetime?.['Average K/D Ratio'] || 'N/A'}`, inline: true },
-          { name: 'Headshots %', value: `${cs2Stats.lifetime?.['Average Headshots %'] || 'N/A'}%`, inline: true }
+          { name: 'Matches', value: stat('Matches'), inline: true },
+          { name: 'Wins', value: stat('Wins'), inline: true },
+          { name: 'Win Rate', value: stat('Win Rate %', '%'), inline: true },
+          { name: 'K/D Ratio', value: stat('Average K/D Ratio'), inline: true },
+          { name: 'Headshots %', value: stat('Average Headshots %', '%'), inline: true }
         )
         .setFooter({ text: 'Powered by FACEIT API' })
         .setTimestamp();
@@ -67,7 +55,7 @@ const command = {
       
     } catch (error) {
       console.error('FACEIT API Error:', error);
-      await interaction.editReply('Error fetching FACEIT data. Please try again later.');
+      await interaction.editReply(faceitErrorMessage(error));
     }
   },
 };

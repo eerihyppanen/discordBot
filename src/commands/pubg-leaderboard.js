@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { getTopPlayers } from "../utils/pubgWinsSystem.js";
+import { truncateText } from '../utils/text.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -29,7 +30,7 @@ const command = {
         const platformIcon = player.platform === 'steam' ? '🖥️' : player.platform === 'xbox' ? '🎮' : '🎮';
         
         return [
-          `${medal} **${player.username}**`,
+          `${medal} **${truncateText(player.username, 64)}**`,
           `   ${platformIcon} ${player.platform.toUpperCase()} • ${player.region}`,
           `   🏅 ${player.wins} wins • 📊 ${player.winRate}% WR • 🎮 ${player.totalMatches} matches`,
           ''

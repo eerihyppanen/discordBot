@@ -29,14 +29,15 @@ test('legacy PC regions resolve to the latest player snapshot without summing ov
   assert.equal((await getPlayerWins('Player', 'steam', 'pc-na')).wins, 8);
   assert.equal((await getPlayerWins('Player', 'steam', 'steam')).region, 'steam');
   assert.equal((await getPlayerWins('Player', 'xbox', 'console')).wins, 2);
-  assert.equal(await fs.readFile(file, 'utf8'), JSON.stringify(saved));
+  const backup = (await fs.readdir(dir)).find(name => name.endsWith('.bak'));
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(dir, backup), 'utf8')), saved);
 });
 
 test('an explicit PC update replaces legacy aliases while retaining unrelated console data', async () => {
   await updatePlayerWins('Player', 'steam', 'steam', 9, 20, 45);
   await flushPubgWinsData();
   const result = JSON.parse(await fs.readFile(file, 'utf8'));
-  assert.deepEqual(Object.keys(result).sort(), ['player_steam_steam', 'player_xbox_console']);
-  assert.equal(result.player_steam_steam.wins, 9);
-  assert.deepEqual(result.player_xbox_console, saved.player_xbox_console);
+  assert.deepEqual(Object.keys(result).sort(), ['player_steam', 'player_xbox']);
+  assert.equal(result.player_steam.wins, 9);
+  assert.deepEqual(result.player_xbox, { ...saved.player_xbox_console, region: 'xbox' });
 });

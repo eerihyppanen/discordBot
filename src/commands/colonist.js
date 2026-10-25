@@ -1,5 +1,6 @@
-import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import { recordWinWithRewards, addLoss, getPlayerStats } from "../utils/colonistSystem.js";
+import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } from "discord.js";
+import { recordWinWithRewards, addLoss, getPlayerStats, ColonistError } from "../utils/colonistSystem.js";
+import { syncLevelRole } from '../utils/levelRoles.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -8,7 +9,9 @@ const command = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('win')
-        .setDescription('Record a Colonist.io win (earn XP and coins!)')
+        .setDescription('Moderator: confirm another player’s win and rewards')
+        .addUserOption(option => option.setName('winner').setDescription('The winning server member (not yourself)').setRequired(true))
+        .addStringOption(option => option.setName('match').setDescription('Unique Colonist match ID').setMinLength(6).setMaxLength(100).setRequired(true))
     )
     .addSubcommand(subcommand =>
       subcommand
@@ -30,15 +33,27 @@ const command = {
     const subcommand = interaction.options.getSubcommand();
     
     if (subcommand === 'win') {
+      if (!interaction.inGuild() || !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+        return interaction.reply({ content: '❌ A moderator with Manage Server must confirm the win.', flags: MessageFlags.Ephemeral });
+      }
+      const winner = interaction.options.getUser('winner');
+      if (!winner || winner.bot || winner.id === interaction.user.id) {
+        return interaction.reply({ content: '❌ Select another human server member as the winner.', flags: MessageFlags.Ephemeral });
+      }
       await interaction.deferReply();
       let recorded = false;
       
       try {
-        const userId = interaction.user.id;
-        const username = interaction.user.username;
+        const member = await interaction.guild.members.fetch(winner.id);
+        const userId = winner.id;
+        const username = winner.username;
         
-        const { result, xpResult, newBalance } = await recordWinWithRewards(userId, username);
+        const { result, xpResult, newBalance, alreadyRecorded } = await recordWinWithRewards(userId, username, {
+          matchId: interaction.options.getString('match'), confirmedBy: interaction.user.id, guildId: interaction.guildId,
+        });
         recorded = true;
+        await syncLevelRole(member);
+        if (alreadyRecorded) return await interaction.editReply('✅ This match is already recorded. No additional rewards were granted.');
 
         // Build response
         const winRate = result.totalGames > 0 
@@ -48,7 +63,7 @@ const command = {
         const embed = new EmbedBuilder()
           .setColor('#FFD700')
           .setTitle('🎉 Colonist.io Victory!')
-          .setDescription(`Congratulations ${interaction.user}! You won a game!`)
+          .setDescription(`Congratulations ${winner}! Your win was confirmed by ${interaction.user}.`)
           .addFields(
             { name: '📊 Game Stats', value: '━━━━━━━━━━━━━━━━', inline: false },
             { name: '🏆 Total Wins', value: `${result.wins}`, inline: true },
@@ -62,7 +77,7 @@ const command = {
             { name: '💰 Coins Earned', value: `+${result.coinReward} coins`, inline: true },
             { name: '💵 New Balance', value: `${newBalance} coins`, inline: true }
           )
-          .setThumbnail(interaction.user.displayAvatarURL())
+          .setThumbnail(winner.displayAvatarURL())
           .setTimestamp();
         
         if (result.streakMultiplier > 0) {
@@ -74,10 +89,11 @@ const command = {
         await interaction.editReply({ embeds: [embed] });
         
       } catch (error) {
+        if (error instanceof ColonistError) return interaction.editReply(`❌ ${error.message}`);
         console.error('Colonist win error:', error);
         const message = recorded
-          ? '✅ Your win and rewards are already recorded. Check /colonist stats before recording another game.'
-          : '❌ Error recording win. Please try again.';
+          ? '✅ The win and rewards are already recorded. Check /colonist stats.'
+          : '❌ Could not finish confirming the win. Retry with the same match ID; rewards will not be duplicated.';
         await interaction.editReply(message);
       }
       
@@ -116,6 +132,7 @@ const command = {
         await interaction.editReply({ embeds: [embed] });
         
       } catch (error) {
+        if (error instanceof ColonistError) return interaction.editReply(`❌ ${error.message}`);
         console.error('Colonist loss error:', error);
         await interaction.editReply('❌ Error recording loss. Please try again.');
       }
