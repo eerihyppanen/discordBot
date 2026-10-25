@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Collection, MessageFlags } from "discord.js";
+import { Client, GatewayIntentBits, Collection } from "discord.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "url";
@@ -10,6 +10,7 @@ import { economy } from './utils/economySystem.js';
 import { reminders } from './utils/reminderSystem.js';
 import { skins } from './utils/skinSystem.js';
 import { createLifecycle } from './utils/lifecycle.js';
+import { dispatchInteraction } from './utils/interactionHandler.js';
 
 // Load data before accepting events. Existing JSON files keep their format.
 await initializeData();
@@ -93,37 +94,10 @@ client.once('clientReady', () => {
   });
 });
 
-// Handle slash command interactions
+// Track both slash commands and collection navigation during shutdown.
 client.on('interactionCreate', interaction => {
-  lifecycle.run(async () => {
-    if (!interaction.isChatInputCommand()) return;
-
-    const command = interaction.client.commands.get(interaction.commandName);
-
-    if (!command) {
-      console.error(`No command matching ${interaction.commandName} was found.`);
-      return;
-    }
-
-    try {
-      await command.execute(interaction);
-    } catch (error) {
-      console.error(`Error executing ${interaction.commandName}:`, error);
-    
-      const errorMessage = {
-        content: 'There was an error while executing this command!',
-        flags: MessageFlags.Ephemeral
-      };
-    
-      if (interaction.deferred && !interaction.replied) {
-        await interaction.editReply({ content: errorMessage.content, embeds: [] });
-      } else if (interaction.replied) {
-        await interaction.followUp(errorMessage);
-      } else {
-        await interaction.reply(errorMessage);
-      }
-    }
-  }).catch((error) => console.error('Failed to respond to interaction:', error));
+  lifecycle.run(() => dispatchInteraction(interaction))
+    .catch(error => console.error('Failed to respond to interaction:', error));
 });
 
 // Global error handlers

@@ -37,10 +37,10 @@
 **Files:** src/utils/skinSystem.js, src/utils/skinList.js, src/commands/lege.js, src/utils/interactionHandler.js, src/app.js, tests/skins.test.js, tests/skin-list.test.js.
 **Interfaces:** skins.undo(userId) returns {skin, userData} or null. Skin button IDs encode owner and requested page; handleSkinButton(interaction) acknowledges navigation and renders current data. dispatchInteraction routes commands and buttons inside lifecycle.run.
 
-- [ ] Write tests for persisted undo, empty undo, failed writes, page boundaries, long names, invalid/unauthorized buttons, stale pages and routing.
-- [ ] Run targeted tests; confirm failures from missing behavior.
-- [ ] Implement queued undo, ten-item pages, owner checks and common interaction dispatch.
-- [ ] Run targeted tests and full suite; commit the task.
+- [x] Write tests for persisted undo, empty undo, failed writes, page boundaries, long names, invalid/unauthorized buttons, stale pages and routing.
+- [x] Run targeted tests; confirm failures from missing behavior.
+- [x] Implement queued undo, ten-item pages, owner checks and common interaction dispatch.
+- [x] Run targeted tests and full suite; commit the task.
 
 ### Task 3: Remove dead code and modernize setup
 

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { skins, emptyCollection } from '../utils/skinSystem.js';
+import { renderSkinList, handleSkinButton, displaySkinName } from '../utils/skinList.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -12,9 +13,11 @@ const command = {
         .addStringOption(option =>
           option.setName('skin')
             .setDescription('Name of the legendary skin (optional)')
+            .setMaxLength(200)
             .setRequired(false)
         )
     )
+    .addSubcommand(subcommand => subcommand.setName('undo').setDescription('Remove your most recently added legendary skin'))
     .addSubcommand(subcommand =>
       subcommand
         .setName('count')
@@ -36,6 +39,8 @@ const command = {
         .setDescription('Show legendary skin leaderboard')
     ),
   
+  handleButton: handleSkinButton,
+
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
     const userId = interaction.user.id;
@@ -43,6 +48,13 @@ const command = {
 
     if (subcommand === 'add') {
       return handleAddSkin(interaction, userId);
+    }
+
+    if (subcommand === 'undo') {
+      const result = await skins.undo(userId);
+      return interaction.editReply(result
+        ? { content: `↩️ Removed **${displaySkinName(result.skin.name)}**. You now have ${result.userData.totalLegendary} legendary skins.`, allowedMentions: { parse: [] } }
+        : 'There are no legendary skins to undo.');
     }
 
     const skinData = await skins.read();
@@ -84,7 +96,6 @@ const handleAddSkin = async (interaction, userId) => {
       { name: '🏆 Total Legendary Skins', value: `${userData.totalLegendary}`, inline: true },
       { name: '📅 Unboxed', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
     )
-    .setThumbnail('https://i.imgur.com/YourLegendaryIcon.png') // You can add a PUBG legendary icon URL
     .setFooter({ text: 'PUBG Legendary Skin Tracker' })
     .setTimestamp();
   
@@ -105,7 +116,7 @@ const handleShowCount = async (interaction, skinData) => {
     .setThumbnail(targetUser.displayAvatarURL())
     .addFields(
       { name: '🏆 Total Legendary Skins', value: `${userData.totalLegendary}`, inline: true },
-      { name: '📦 Recent Skins', value: `${userData.skins.slice(-3).map(s => s.name).join('\n') || 'None'}`, inline: true },
+      { name: '📦 Recent Skins', value: `${userData.skins.slice(-3).map(s => displaySkinName(s.name)).join('\n') || 'None'}`, inline: true },
       { name: '⏰ Last Unboxed', value: lastUnbox, inline: true }
     )
     .setFooter({ text: 'PUBG Legendary Skin Tracker' })
@@ -115,36 +126,8 @@ const handleShowCount = async (interaction, skinData) => {
 };
 
 // Handle listing all skins
-const handleListSkins = async (interaction, skinData, userId) => {
-  const userData = skinData[userId] || emptyCollection();
-  
-  if (userData.skins.length === 0) {
-    return interaction.editReply('📦 You haven\'t unboxed any legendary skins yet! Use `/lege add` when you get one!');
-  }
-  
-  const skinsPerPage = 10;
-  const skins = userData.skins.slice().reverse(); // Show newest first
-  const pages = Math.ceil(skins.length / skinsPerPage);
-  const currentSkins = skins.slice(0, skinsPerPage);
-  
-  const skinList = currentSkins.map((skin, index) => {
-    const unboxTime = `<t:${Math.floor(skin.unboxedAt / 1000)}:d>`;
-    return `**${skins.length - index}.** ${skin.name} - ${unboxTime}`;
-  }).join('\n');
-  
-  const embed = new EmbedBuilder()
-    .setColor('#9b59b6')
-    .setTitle(`📋 ${interaction.user.username}'s Legendary Collection`)
-    .setDescription(skinList)
-    .addFields(
-      { name: '📊 Total Count', value: `${userData.totalLegendary} legendary skins`, inline: true },
-      { name: '📄 Page', value: `1/${pages}`, inline: true }
-    )
-    .setFooter({ text: 'PUBG Legendary Skin Collection' })
-    .setTimestamp();
-  
-  await interaction.editReply({ embeds: [embed] });
-};
+const handleListSkins = (interaction, skinData, userId) =>
+  interaction.editReply(renderSkinList(interaction.user, skinData[userId]));
 
 // Handle leaderboard
 const handleLeaderboard = async (interaction, skinData) => {

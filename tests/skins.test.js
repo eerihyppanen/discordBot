@@ -105,3 +105,47 @@ test('malformed skin data is reported and preserved on both reads and additions'
   await assert.rejects(corrupt.add('user', 'Skin'), SyntaxError);
   assert.equal(await fs.readFile(corruptFile, 'utf8'), '{broken');
 });
+
+test('undo saves removal of only the invoking user latest skin before confirmation', async () => {
+  await skins.add('undo-user', 'First');
+  await skins.add('undo-user', 'Second');
+  const beforeOther = (await skins.read()).existing;
+  let reply;
+  const request = interaction('undo', 'undo-user');
+  request.editReply = async payload => {
+    reply = payload;
+    const user = JSON.parse(await fs.readFile(file, 'utf8'))['undo-user'];
+    assert.equal(user.totalLegendary, 1);
+    assert.deepEqual(user.skins.map(skin => skin.name), ['First']);
+    assert.equal(user.lastUnbox, user.skins[0].unboxedAt);
+  };
+  await command.execute(request);
+  assert.match(JSON.stringify(reply), /Second/);
+  assert.deepEqual((await skins.read()).existing, beforeOther);
+});
+
+test('undo handles an empty collection and resets the last skin timestamp to zero', async () => {
+  assert.equal(typeof skins.undo, 'function');
+  assert.equal(await skins.undo('unknown-user'), null);
+  await skins.add('single-user', 'Only skin');
+  const result = await skins.undo('single-user');
+  assert.equal(result.skin.name, 'Only skin');
+  assert.deepEqual(result.userData, { totalLegendary: 0, skins: [], lastUnbox: 0 });
+  assert.equal(await skins.undo('single-user'), null);
+});
+
+test('an undo write failure preserves the original skin in memory and on retry', async () => {
+  assert.equal(typeof skins.undo, 'function');
+  await skins.add('undo-failure', 'Keep me');
+  const previous = await fs.readFile(file);
+  await fs.unlink(file);
+  await fs.mkdir(file);
+  try {
+    await assert.rejects(skins.undo('undo-failure'));
+    assert.equal((await skins.read())['undo-failure'].skins[0].name, 'Keep me');
+  } finally {
+    await fs.rmdir(file);
+    await fs.writeFile(file, previous);
+  }
+  assert.equal((await skins.undo('undo-failure')).skin.name, 'Keep me');
+});
