@@ -75,3 +75,14 @@ The user requested another increase for messages and wins while asking which act
 - Build and compiled-runtime XP smoke passed. No XP is granted for losses; coins retain their existing amounts.
 - Changes remain on the feature branch awaiting explicit merge permission.
 
+## Follow-up: admin status
+
+Add the requested `/admin status` under the existing Manage Server permission gate. Replies are private. Show Discord readiness and gateway latency, process uptime, memory use, Node version, loaded command count, and whether the PUBG/FACEIT keys and command-registration settings are present. Never display secret values or send diagnostic API requests. Missing and sample-placeholder keys must not appear configured. Explain that configured keys have not been authenticated by this command.
+
+- [x] Add regression tests for metadata, permission checks, private replies, actual SDK client state, missing/sample configuration, secret redaction and absence of API calls.
+- [x] Implement a focused status renderer and route the subcommand before the Colonist fallback.
+- [x] Update README/help, run full tests/build and a compiled status check, then commit only to the review branch.
+- [x] Keep main unchanged pending merge approval. Configurable XP and extra `/level` reward information remain proposals, not part of this request.
+
+
+Status verification: 161 full-suite tests passed, build passed, and compiled-runtime checks passed with an actual SDK client. Permission checks, ephemeral replies, missing/sample settings and secret masking are covered; no external API calls are made. The branch remains unmerged.

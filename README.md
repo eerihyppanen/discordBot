@@ -64,7 +64,7 @@ current subcommands, required and optional parameters, and available choices.
 | Area | Commands |
 | --- | --- |
 | PUBG Steam PC | `/pubg stats [username] [view]`, `/pubg leaderboard [source]` |
-| Moderator tools | `/admin pubg-stats username wins matches`, `/admin colonist-cancel player` (Manage Server required) |
+| Moderator tools | `/admin pubg-stats username wins matches`, `/admin colonist-cancel player`, `/admin status` (Manage Server required) |
 | Other games | `/faceit [username]`, `/colonist game`, `/colonist win`, `/colonist stats`, `/colonist-leaderboard` |
 | Saved game usernames | `/profile set [pubg] [faceit]`, `/profile show`, `/profile clear game` |
 | Legendary skins | `/lege add`, `/lege undo`, `/lege count`, `/lege list`, `/lege leaderboard` |
@@ -104,6 +104,17 @@ Set `CHANNEL_ID` to keep welcomes working when a channel is renamed, or use the
 existing `CHANNEL_NAME` setting. With neither configured, welcomes are disabled.
 Missing/non-message channels are skipped; delivery is awaited and failures logged.
 The unused meme helpers and `MEME_URL` setting have been removed.
+
+### Bot status
+
+`/admin status` requires Manage Server and replies privately. It shows the current
+Discord connection and gateway latency, process uptime, memory use, Node version
+and architecture, loaded command count, and configuration flags for PUBG, FACEIT
+and slash-command registration. Secret values and IDs are never displayed.
+API keys are checked for presence, including detection of the sample API keys;
+the command does not authenticate them or make external API calls. A game stats
+lookup verifies whether its API key is accepted. Re-register slash commands to
+make the new status subcommand available.
 
 ### Correcting and browsing legendary skins
 

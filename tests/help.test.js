@@ -35,6 +35,7 @@ test('general help reflects the live registry and counts each command exactly on
 test('detailed help uses current required inputs, optional inputs, choices and subcommands', async () => {
   const manual = JSON.stringify(await show('admin'));
   assert.match(manual, /\/admin pubg-stats/);
+  assert.match(manual, /\/admin status/);
   assert.match(manual, /<username>/);
   assert.match(manual, /<wins>/);
   assert.match(manual, /<matches>/);
