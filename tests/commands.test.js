@@ -14,12 +14,12 @@ const { default: gamble } = await import('../src/commands/gamble.js');
 const { default: colonist } = await import('../src/commands/colonist.js');
 const { default: remind, parseTime } = await import('../src/commands/remind.js');
 const { economy } = await import('../src/utils/economySystem.js');
-const { flushPubgWinsData, getPlayerWins } = await import('../src/utils/pubgWinsSystem.js');
+const { flushPubgWinsData, getPlayerWins, manualPubgStats } = await import('../src/utils/pubgWinsSystem.js');
 const { flushColonistData, getPlayerStats, addLoss, recordWinWithRewards } = await import('../src/utils/colonistSystem.js');
 const { flushLevelingData, getUserLevel, addXP } = await import('../src/utils/levelingSystem.js');
 
 after(async () => {
-  await Promise.all([flushPubgWinsData(), flushColonistData(), flushLevelingData()]);
+  await Promise.all([flushPubgWinsData(), manualPubgStats.flush(), flushColonistData(), flushLevelingData()]);
   await fs.rm(directory, { recursive: true, force: true });
 });
 
@@ -70,7 +70,8 @@ test('authorized manual changes succeed and include an audit record', async () =
   let audit;
   console.info = (...args) => { audit = args; };
   try { await manual.execute(admin); } finally { console.info = original; }
-  assert.equal((await getPlayerWins('player', 'steam', 'pc-eu')).wins, 5);
+  assert.equal((await manualPubgStats.getPlayerWins('player', 'steam')).wins, 5);
+  assert.equal(await getPlayerWins('player', 'steam'), null);
   assert.equal(audit[1].actorId, 'moderator');
   assert.equal(audit[1].wins, 5);
 });
@@ -85,6 +86,17 @@ test('daily, balance, and Colonist commands preserve concurrent economy changes'
   assert.ok(saved['daily-user'].coins >= 200);
   assert.equal(saved['balance-user'].coins, 100);
   assert.equal(saved['colonist-user'].coins, 200);
+});
+
+test('balance shows usable wallet coins while preserving stored legacy bank values', async () => {
+  await economy.updateUser('legacy-bank-user', user => { user.coins = 120; user.bank = 75; });
+  const request = interaction('legacy-bank-user');
+  let output;
+  request.editReply = async payload => { output = payload.embeds[0].toJSON(); };
+  await balance.execute(request);
+  assert.deepEqual(output.fields.map(field => field.name), ['💵 Wallet']);
+  assert.equal(output.fields[0].value, '120 coins');
+  assert.equal((await economy.getBalance('legacy-bank-user')).bank, 75);
 });
 
 test('gambling commits the balance before responding', async () => {
@@ -251,7 +263,7 @@ test('a response failure after a saved win does not tell the user to record it a
   assert.equal((await economy.getBalance(userId)).coins, 200);
 });
 
-test('manual PUBG changes use the same Steam record as automatic PC lookups', async () => {
+test('manual PUBG totals use Steam records independently of automatic PC lookups', async () => {
   assert.deepEqual(manual.data.toJSON().options.find(option => option.name === 'pubg-stats').options.map(option => option.name), ['username', 'wins', 'matches']);
   const admin = interaction('pc-moderator', {
     subcommand: 'pubg-stats',
@@ -262,6 +274,7 @@ test('manual PUBG changes use the same Steam record as automatic PC lookups', as
   const originalInfo = console.info;
   console.info = () => {};
   try { await manual.execute(admin); } finally { console.info = originalInfo; }
-  assert.equal((await getPlayerWins('PCPlayer', 'steam', 'steam')).wins, 7);
-  assert.equal(await getPlayerWins('PCPlayer', 'xbox', 'console'), null);
+  assert.equal((await manualPubgStats.getPlayerWins('PCPlayer', 'steam')).wins, 7);
+  assert.equal(await getPlayerWins('PCPlayer', 'steam'), null);
+  assert.equal(await manualPubgStats.getPlayerWins('PCPlayer', 'xbox'), null);
 });

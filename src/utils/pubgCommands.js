@@ -1,19 +1,8 @@
 import { EmbedBuilder } from 'discord.js';
-import { fetchPCPlayer, pubgHeaders, PUBG_SHARD } from './pubgClient.js';
-import { getTopPlayers, updatePlayerWins } from './pubgWinsSystem.js';
+import { pubgClient, PUBG_SHARD } from './pubgClient.js';
+import { getTopPlayers, updatePlayerWins, manualPubgStats } from './pubgWinsSystem.js';
 import { truncateText } from './text.js';
-
-const matchStats = async (id, player) => {
-  const response = await fetch(`https://api.pubg.com/shards/${PUBG_SHARD}/matches/${encodeURIComponent(id)}`, {
-    headers: pubgHeaders(), signal: AbortSignal.timeout(20000),
-  });
-  if (!response.ok) return null;
-  const data = await response.json();
-  return data.included?.find(item => item.type === 'participant' && (
-    item.attributes?.stats?.playerId === player.id ||
-    item.attributes?.stats?.name?.toLowerCase() === player.attributes.name.toLowerCase()
-  ))?.attributes.stats ?? null;
-};
+import { profiles } from './profileSystem.js';
 
 export const showPubgStats = async interaction => {
   await interaction.deferReply();
@@ -21,11 +10,15 @@ export const showPubgStats = async interaction => {
     return interaction.editReply('❌ PUBG API key not configured. Please contact the bot administrator.');
   }
   try {
-    const player = await fetchPCPlayer(interaction.options.getString('username'));
+    const username = interaction.options.getString('username') ?? (await profiles.get(interaction.user.id)).pubg;
+    if (typeof username !== 'string' || !username.trim() || username.trim().length > 64) {
+      return interaction.editReply('❌ Enter a PUBG username or save one with `/profile set pubg:<username>`.');
+    }
+    const player = await pubgClient.getPlayer(username);
     if (!player) return interaction.editReply('❌ Player not found!');
-    const ids = (player.relationships?.matches?.data ?? []).slice(0, 20).map(match => match.id);
+    const ids = [...new Set((player.relationships?.matches?.data ?? []).slice(0, 20).map(match => match.id))];
     if (interaction.options.getString('view') === 'last') {
-      const stats = ids.length ? await matchStats(ids[0], player) : null;
+      const stats = ids.length ? await pubgClient.getMatchStats(ids[0], player) : null;
       const embed = new EmbedBuilder().setColor('#ff6b35').setTitle(`🔫 PUBG Stats: ${player.attributes.name}`)
         .addFields({ name: 'Player', value: player.attributes.name, inline: true },
           { name: 'Platform', value: 'STEAM', inline: true }, { name: 'Shard', value: PUBG_SHARD.toUpperCase(), inline: true });
@@ -43,19 +36,19 @@ export const showPubgStats = async interaction => {
     }
     if (!ids.length) return interaction.editReply(`❌ Found player **${player.attributes.name}** but no recent matches were returned by PUBG API. Try again after playing a match.`);
     let wins = 0, analyzed = 0, kills = 0, damage = 0;
-    for (const id of ids) {
-      try {
-        const stats = await matchStats(id, player);
-        if (!stats) continue;
-        analyzed++;
-        if (stats.winPlace === 1) wins++;
-        kills += stats.kills || 0;
-        damage += stats.damageDealt || 0;
-      } catch (error) { console.error(`Error fetching PUBG match ${id}:`, error); }
+    const results = await Promise.allSettled(ids.map(id => pubgClient.getMatchStats(id, player)));
+    for (const result of results) {
+      if (result.status === 'rejected' || !result.value) continue;
+      const stats = result.value;
+      analyzed++;
+      if (stats.winPlace === 1) wins++;
+      kills += stats.kills;
+      damage += stats.damageDealt;
     }
-    if (!analyzed) return interaction.editReply(`❌ Could not load participant stats for **${player.attributes.name}**. Try again in a moment.`);
+    if (!analyzed) return interaction.editReply(`❌ Could not load participant stats for **${player.attributes.name}**. Saved ranking unchanged. Try again in a moment.`);
     const rate = ((wins / analyzed) * 100).toFixed(1);
-    await updatePlayerWins(player.attributes.name, 'steam', PUBG_SHARD, wins, analyzed, Number(rate));
+    const complete = analyzed === ids.length;
+    if (complete) await updatePlayerWins(player.attributes.name, 'steam', PUBG_SHARD, wins, analyzed, Number(rate));
     const embed = new EmbedBuilder().setColor('#ffd700').setTitle('🏆 PUBG Win Statistics')
       .setDescription(`**${player.attributes.name}**\nSTEAM • ${PUBG_SHARD.toUpperCase()}`)
       .addFields(
@@ -65,7 +58,7 @@ export const showPubgStats = async interaction => {
         { name: '💀 Avg Kills', value: (kills / analyzed).toFixed(1), inline: true },
         { name: '💥 Avg Damage', value: `${Math.round(damage / analyzed)}`, inline: true },
       )
-      .setFooter({ text: `Analyzed ${analyzed}/${ids.length} recent matches (up to 20) • /pubg leaderboard` }).setTimestamp();
+      .setFooter({ text: `Analyzed ${analyzed}/${ids.length} recent matches (up to 20)${complete ? ' • /pubg leaderboard' : ' • Partial results; saved ranking unchanged'}` }).setTimestamp();
     return interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error('PUBG API Error:', error);
@@ -76,15 +69,18 @@ export const showPubgStats = async interaction => {
 export const showPubgLeaderboard = async interaction => {
   await interaction.deferReply();
   try {
-    const players = await getTopPlayers(10);
-    if (!players.length) return interaction.editReply('📊 No players tracked yet! Use `/pubg stats` to start tracking players.');
+    const manual = interaction.options.getString('source') === 'manual';
+    const players = await (manual ? manualPubgStats.getTopPlayers(10) : getTopPlayers(10));
+    if (!players.length) return interaction.editReply(manual
+      ? '📊 No manual totals yet. A moderator can add them with `/admin pubg-stats`.'
+      : '📊 No recent snapshots yet! Use `/pubg stats` to start tracking players.');
     const text = players.map((player, index) => [
       `${['🥇', '🥈', '🥉'][index] ?? `${index + 1}.`} **${truncateText(player.username, 64)}**`,
       `   ${player.platform.toUpperCase()} • ${player.region}`,
       `   🏅 ${player.wins} wins • 📊 ${player.winRate}% WR • 🎮 ${player.totalMatches} matches`,
     ].join('\n')).join('\n\n');
-    const embed = new EmbedBuilder().setColor('#ffd700').setTitle('🏆 PUBG Win Leaderboard')
-      .setDescription(text).setFooter({ text: 'Saved recent-match snapshots; may include manual updates' }).setTimestamp();
+    const embed = new EmbedBuilder().setColor('#ffd700').setTitle(manual ? '🏆 PUBG Manual Totals Leaderboard' : '🏆 PUBG Recent Wins Leaderboard')
+      .setDescription(text).setFooter({ text: manual ? 'Moderator-entered totals; separate from recent matches' : 'Saved recent-match snapshots; legacy rows may have an unknown source' }).setTimestamp();
     return interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error('PUBG Leaderboard Error:', error);
@@ -100,19 +96,19 @@ export const setPubgStats = async interaction => {
   if (wins > matches) return interaction.editReply('❌ Wins cannot be greater than total matches!');
   try {
     const rate = ((wins / matches) * 100).toFixed(1);
-    await updatePlayerWins(username, 'steam', PUBG_SHARD, wins, matches, Number(rate));
+    await manualPubgStats.updatePlayerWins(username, 'steam', PUBG_SHARD, wins, matches, Number(rate));
     console.info('Manual PUBG stats update:', {
       actorId: interaction.user.id, guildId: interaction.guildId,
       username, platform: 'steam', region: PUBG_SHARD, wins, matches,
     });
-    const embed = new EmbedBuilder().setColor('#00ff00').setTitle('✅ PUBG Stats Updated')
-      .setDescription(`**${username}** stats have been manually updated!`)
+    const embed = new EmbedBuilder().setColor('#00ff00').setTitle('✅ PUBG Manual Totals Updated')
+      .setDescription(`**${username}** manual totals have been saved separately from recent API matches.`)
       .addFields(
         { name: '🎮 Platform', value: 'STEAM', inline: true },
         { name: '🏅 Wins', value: `${wins}`, inline: true },
         { name: '🎮 Matches', value: `${matches}`, inline: true },
         { name: '📈 Win Rate', value: `${rate}%`, inline: true },
-      ).setFooter({ text: 'Use /pubg leaderboard to see updated rankings' }).setTimestamp();
+      ).setFooter({ text: 'Use /pubg leaderboard source:manual to see updated totals' }).setTimestamp();
     return interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error('Manual PUBG update error:', error);

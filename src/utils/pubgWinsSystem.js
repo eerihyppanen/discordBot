@@ -6,8 +6,8 @@ import { createJsonStore, dataFile } from './jsonStore.js';
 const playerKey = (username, platform) => `${username.trim().toLowerCase()}_${platform}`;
 const timestamp = player => Date.parse(player.lastUpdated) || 0;
 
-export const createPubgWinsSystem = (file) => {
-  const store = createJsonStore(file, { saveDelayMs: 5 * 60 * 1000 });
+export const createPubgWinsSystem = (file, { saveDelayMs = 5 * 60 * 1000 } = {}) => {
+  const store = createJsonStore(file, { saveDelayMs });
   let initialization;
   const initialize = () => initialization ??= (async () => {
     await store.initialize();
@@ -65,6 +65,7 @@ export const createPubgWinsSystem = (file) => {
 };
 
 const system = createPubgWinsSystem(dataFile('pubgWins.json'));
+export const manualPubgStats = createPubgWinsSystem(dataFile('pubgManualStats.json'), { saveDelayMs: 0 });
 export const initializePubgWinsData = system.initialize;
 export const flushPubgWinsData = system.flush;
 export const { updatePlayerWins, getPlayerWins, getTopPlayers, getAllPlayers } = system;

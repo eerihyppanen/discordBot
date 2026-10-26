@@ -30,12 +30,22 @@ test('existing under-levelled data displays its correct level without writing on
 test('message XP cooldown is atomic across concurrent messages and allows the next minute', async () => {
   const results = await Promise.all(Array.from({ length: 20 }, () => addMessageXP('chat-user', 1_000_000)));
   assert.equal(results.filter(r => r.awarded).length, 1);
-  assert.equal((await getUserLevel('chat-user')).xp, 15);
+  assert.equal((await getUserLevel('chat-user')).xp, 20);
   assert.equal((await addMessageXP('chat-user', 1_059_999)).awarded, false);
-  assert.equal((await addMessageXP('chat-user', 1_060_000)).xp, 30);
+  assert.equal((await addMessageXP('chat-user', 1_060_000)).xp, 40);
   await flushLevelingData();
   const saved = JSON.parse(await fs.readFile(`${directory}/userLevels.json`, 'utf8'));
   assert.equal(saved['chat-user'].lastMessageXPAt, 1_060_000);
+});
+
+test('twenty eligible messages reach level two without changing existing thresholds', async () => {
+  for (let minute = 0; minute < 19; minute++) await addMessageXP('easier-levels', minute * 60_000);
+  assert.equal((await getUserLevel('easier-levels')).xp, 380);
+  assert.equal((await getUserLevel('easier-levels')).level, 1);
+  const reached = await addMessageXP('easier-levels', 19 * 60_000);
+  assert.equal(reached.xp, 400);
+  assert.equal(reached.level, 2);
+  assert.equal(reached.leveledUp, true);
 });
 
 test('large XP rewards cross all level thresholds and duplicate reward IDs grant no XP', async () => {

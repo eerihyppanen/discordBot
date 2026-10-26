@@ -27,7 +27,7 @@ test('general help reflects the live registry and counts each command exactly on
   const text = JSON.stringify(output);
   assert.match(text, /new-command/);
   assert.doesNotMatch(text, /play-simple/);
-  assert.match(output.footer.text, /Total Commands: 15\b/);
+  assert.match(output.footer.text, /Total Commands: 16\b/);
   for (const removed of ['groq', 'pubg-wins', 'pubg-leaderboard', 'pubg-wins-add']) assert.equal(registry.has(removed), false);
   for (const name of registry.keys()) assert.ok(output.fields.some(field => field.name === '/' + name), name);
 });
@@ -45,6 +45,8 @@ test('detailed help uses current required inputs, optional inputs, choices and s
   const leaderboard = JSON.stringify(await show('colonist-leaderboard'));
   assert.match(leaderboard, /wins/);
   assert.match(leaderboard, /streaks/);
+  assert.match(JSON.stringify(await show('profile')), /\/profile set \[pubg\] \[faceit\]/);
+  assert.match(JSON.stringify(await show('pubg')), /manual/);
 });
 
 test('help for a removed or unknown command reports it as unavailable', async () => {

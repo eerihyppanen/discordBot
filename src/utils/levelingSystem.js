@@ -13,6 +13,7 @@ export const initializeData = store.initialize;
 export const flushLevelingData = store.flush;
 
 export const MESSAGE_XP_COOLDOWN_MS = 60_000;
+export const MESSAGE_XP = 20;
 
 export const addXP = (userId, xpGained = 15, { beforeCommit, rewardId, messageAt } = {}) => store.update(async (users) => {
   if (!Number.isSafeInteger(xpGained) || xpGained < 0) throw new Error('Invalid XP amount');
@@ -35,7 +36,7 @@ export const addXP = (userId, xpGained = 15, { beforeCommit, rewardId, messageAt
   return result;
 });
 
-export const addMessageXP = (userId, now = Date.now()) => addXP(userId, 15, { messageAt: now });
+export const addMessageXP = (userId, now = Date.now()) => addXP(userId, MESSAGE_XP, { messageAt: now });
 
 export const getUserLevel = async (userId) => {
   const user = (await store.read())[userId];

@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { getFaceitStats, faceitErrorMessage } from '../utils/faceitClient.js';
 import { truncateText } from '../utils/text.js';
+import { profiles } from '../utils/profileSystem.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -8,19 +9,15 @@ const command = {
     .setDescription('Check FACEIT stats for a player')
     .addStringOption(option =>
       option.setName('username')
-        .setDescription('FACEIT username to lookup')
+        .setDescription('FACEIT username (default: your saved profile)')
         .setMinLength(1)
         .setMaxLength(50)
-        .setRequired(true)
     ),
   
   async execute(interaction) {
-    const username = interaction.options.getString('username');
+    let username = interaction.options.getString('username');
     
     await interaction.deferReply();
-    if (typeof username !== 'string' || !username.trim() || username.length > 50) {
-      return interaction.editReply('❌ Enter a FACEIT username of 1–50 characters.');
-    }
     
     // Check if API key is configured
     if (!process.env.FACEIT_API_KEY || process.env.FACEIT_API_KEY === 'your_faceit_api_key_here') {
@@ -29,6 +26,10 @@ const command = {
     }
     
     try {
+      username ??= (await profiles.get(interaction.user.id)).faceit;
+      if (typeof username !== 'string' || !username.trim() || username.trim().length > 50) {
+        return interaction.editReply('❌ Enter a FACEIT username of 1–50 characters or save one with `/profile set faceit:<username>`.');
+      }
       const { player: playerData, profile: cs2Stats, lifetime, game } = await getFaceitStats(username.trim());
       const stat = (key, suffix = '') => lifetime[key] == null
         ? 'N/A' : truncateText(`${lifetime[key]}${suffix}`, 100);

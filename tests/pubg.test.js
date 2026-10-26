@@ -1,4 +1,4 @@
-import test, { after } from 'node:test';
+import test, { after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -10,19 +10,22 @@ const originalKey = process.env.PUBG_API_KEY;
 process.env.DATA_DIR = dir;
 process.env.PUBG_API_KEY = 'offline-test-key';
 const { default: pubg } = await import('../src/commands/pubg.js');
-const { getPlayerWins, flushPubgWinsData } = await import('../src/utils/pubgWinsSystem.js');
+const { getPlayerWins, updatePlayerWins, flushPubgWinsData, manualPubgStats } = await import('../src/utils/pubgWinsSystem.js');
+let testTime = Date.now();
+beforeEach(t => { testTime += 60 * 60 * 1000; t.mock.method(Date, 'now', () => testTime); });
 after(async () => {
   await flushPubgWinsData();
+  await manualPubgStats.flush();
   if (originalDataDir === undefined) delete process.env.DATA_DIR; else process.env.DATA_DIR = originalDataDir;
   if (originalKey === undefined) delete process.env.PUBG_API_KEY; else process.env.PUBG_API_KEY = originalKey;
   await fs.rm(dir, { recursive: true, force: true });
 });
 
-const run = async (view, username = 'Player', subcommand = 'stats') => {
+const run = async (view, username = 'Player', subcommand = 'stats', source = null) => {
   let reply;
   const request = {
     // Stale registered console options must never redirect a PC lookup.
-    options: { getSubcommand: () => subcommand, getString: name => ({ username, view, platform: 'xbox', region: 'console' })[name] },
+    options: { getSubcommand: () => subcommand, getString: name => ({ username, view, source, platform: 'xbox', region: 'console' })[name] },
     deferReply: async () => {},
     editReply: async payload => { reply = payload.embeds ? payload.embeds[0].toJSON() : payload; },
   };
@@ -91,4 +94,38 @@ test('/pubg stats defaults to recent and /pubg leaderboard reads saved statistic
     assert.match(leaderboard.title, /Leaderboard/);
     assert.match(leaderboard.description, /Player/);
   } finally { process.env.PUBG_API_KEY = 'offline-test-key'; }
+});
+
+test('partial match results are labelled and do not replace a complete saved snapshot', async t => {
+  await updatePlayerWins('Player', 'steam', 'steam', 9, 20, 45);
+  const partial = { ...player, relationships: { matches: { data: [{ id: 'good' }, { id: 'unavailable' }] } } };
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (url.includes('/players?')) return response({ data: [partial] });
+    return url.endsWith('/unavailable') ? { ok: false, status: 503 } : response(match);
+  });
+  const reply = await run('recent');
+  assert.match(JSON.stringify(reply), /partial/i);
+  assert.match(JSON.stringify(reply), /ranking unchanged/i);
+  assert.equal((await getPlayerWins('Player', 'steam')).wins, 9);
+});
+
+test('recent summaries analyze only twenty matches', async t => {
+  let matchCalls = 0;
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (url.includes('/players?')) return response({ data: [{ ...player, relationships: { matches: { data: Array.from({ length: 25 }, (_, index) => ({ id: 'limited-' + index })) } } }] });
+    matchCalls++;
+    return response(match);
+  });
+  await run('recent');
+  assert.equal(matchCalls, 20);
+  assert.equal((await getPlayerWins('Player', 'steam')).totalMatches, 20);
+});
+
+test('leaderboards keep manual totals separate from recent API snapshots', async () => {
+  await manualPubgStats.updatePlayerWins('ManualOnly', 'steam', 'steam', 80, 100, 80);
+  const manual = await run(null, null, 'leaderboard', 'manual');
+  assert.match(manual.title, /manual/i);
+  assert.match(manual.description, /ManualOnly/);
+  const recent = await run(null, null, 'leaderboard');
+  assert.doesNotMatch(recent.description, /ManualOnly/);
 });

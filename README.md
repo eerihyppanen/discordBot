@@ -22,8 +22,8 @@ Keep credentials out of Git and do not share `.env`.
 | `DATA_DIR` | Persistent JSON directory; defaults to `data` in the working directory |
 | `PUBG_API_KEY` | PUBG commands |
 | `FACEIT_API_KEY` | FACEIT command |
-| `CHANNEL_NAME` | Optional welcome channel name |
-| `MEME_URL` | Optional image for customizing welcome messages |
+| `CHANNEL_ID` | Optional welcome channel ID; takes priority over the name |
+| `CHANNEL_NAME` | Optional welcome channel name when no ID is configured |
 
 ```sh
 npm test                 # local regression suite, no live API keys needed
@@ -63,9 +63,10 @@ current subcommands, required and optional parameters, and available choices.
 
 | Area | Commands |
 | --- | --- |
-| PUBG Steam PC | `/pubg stats username [view]`, `/pubg leaderboard` |
+| PUBG Steam PC | `/pubg stats [username] [view]`, `/pubg leaderboard [source]` |
 | Moderator tools | `/admin pubg-stats username wins matches`, `/admin colonist-cancel player` (Manage Server required) |
-| Other games | `/faceit username`, `/colonist game`, `/colonist win`, `/colonist stats`, `/colonist-leaderboard` |
+| Other games | `/faceit [username]`, `/colonist game`, `/colonist win`, `/colonist stats`, `/colonist-leaderboard` |
+| Saved game usernames | `/profile set [pubg] [faceit]`, `/profile show`, `/profile clear game` |
 | Legendary skins | `/lege add`, `/lege undo`, `/lege count`, `/lege list`, `/lege leaderboard` |
 | XP | `/level`, `/leaderboard` |
 | Virtual economy | `/balance`, `/daily`, `/gamble coinflip`, `/gamble slots`, `/gamble dice` |
@@ -74,9 +75,35 @@ current subcommands, required and optional parameters, and available choices.
 PUBG lookups and manual statistics both use Steam PC player records; platform and
 region inputs are no longer required. Recent PUBG statistics cover up to the last
 20 available matches, not lifetime totals. `/pubg stats` defaults to the recent-match
-summary and refreshes the saved ranking; `view:last` shows the latest match's details
-without changing the ranking. `/admin pubg-stats` sets the same saved snapshot;
-a later recent-match lookup replaces it with API statistics.
+summary; `view:last` shows the latest match's details without changing the ranking.
+Successful player responses are cached for two minutes and match statistics for
+fifteen minutes in memory. Concurrent identical requests share their work, caches
+are bounded to 500 entries, and at most three PUBG requests run at a time.
+The ranking is refreshed only when every requested match is successfully analyzed.
+Partial results are labelled and leave the previous saved ranking intact.
+
+`/admin pubg-stats` sets **independent manual totals**, saved before confirmation.
+`/pubg leaderboard source:manual` ranks those totals; the default `source:recent`
+ranks recent-match snapshots. API refreshes cannot overwrite manual totals.
+Historic rows did not record whether they were manual or API updates, so those rows
+remain in the existing recent-ranking table. Re-enter any historic manual totals
+with `/admin pubg-stats` to place them in the separate manual table.
+
+### Saved usernames
+
+Use `/profile set pubg:YourName faceit:YourName` to save either or both names.
+After that, `/pubg stats` and `/faceit` can use your saved names without a username
+argument. An explicit username looks up someone else without changing your profile.
+`/profile show` displays your preferences privately. `/profile clear game:pubg`,
+`game:faceit`, or `game:all` removes them. Profiles save only the caller's settings,
+survive restarts, and are a convenience rather than verified game-account ownership.
+
+### Welcome messages
+
+Set `CHANNEL_ID` to keep welcomes working when a channel is renamed, or use the
+existing `CHANNEL_NAME` setting. With neither configured, welcomes are disabled.
+Missing/non-message channels are skipped; delivery is awaited and failures logged.
+The unused meme helpers and `MEME_URL` setting have been removed.
 
 ### Correcting and browsing legendary skins
 
@@ -99,10 +126,13 @@ sending but before recording completion can cause a duplicate delivery.
 
 ## Rewards and levels
 
-Eligible server messages earn 15 XP at most once per user per 60 seconds, shared
+Eligible server messages earn 20 XP at most once per user per 60 seconds, shared
 across channels and servers. Bots, webhooks and DMs do not earn XP. Rewards can
 cross multiple level thresholds. Eligible messages and confirmed Colonist wins
 synchronize the member's level role; a later message can retry a missed update.
+Existing XP and level thresholds are preserved. Level 2 requires 400 XP: twenty
+eligible messages instead of twenty-seven. Colonist reward amounts are unchanged.
+`/balance` shows usable wallet coins; stored legacy bank values are retained.
 
 ### Colonist games with friends
 
@@ -145,7 +175,8 @@ use the button flow. `/colonist loss` remains available for standalone losses,
 but is blocked while the caller belongs to an active game, whose losses are automatic.
 
 Re-register slash commands after upgrading. The consolidated `/pubg` and `/admin`
-commands replace `/pubg-wins`, `/pubg-leaderboard`, and `/pubg-wins-add`.
+commands replace `/pubg-wins`, `/pubg-leaderboard`, and `/pubg-wins-add`. The new
+`/profile`, optional lookup usernames, and leaderboard source option also require registration.
 Groq chat has been removed; its environment variables are no longer used.
 Back up and restore the entire data directory together, including game sessions,
 rather than restoring individual reward files.
@@ -157,12 +188,13 @@ balance by 80 coins. Rolling a sum of seven loses the stake.
 
 Keep `DATA_DIR` on persistent storage and back it up before upgrades. User records
 are retained, with cooldown and reward-receipt fields added as needed. Data files: `economy.json`, `userLevels.json`, `pubgWins.json`,
-`colonistWins.json`, `colonistGames.json`, `pubgSkins.json`, and `reminders.json`.
+`pubgManualStats.json`, `playerProfiles.json`, `colonistWins.json`, `colonistGames.json`,
+`pubgSkins.json`, and `reminders.json`.
 
 Run **one bot process per data directory**; update queues are process-local.
 Writes use temporary files and atomic replacement. Malformed or unreadable JSON
 is reported rather than silently resetting users. Economy, skin changes, and
-reminders are saved before confirmation. Colonist game results save every participant’s
+reminders, profile changes, and manual PUBG totals are saved before confirmation. Colonist game results save every participant’s
 statistics and the winner’s coins/XP before reporting success. Chat XP, PUBG and unconfirmed Colonist
 loss statistics batch writes for up to five minutes to reduce SD-card writes.
 

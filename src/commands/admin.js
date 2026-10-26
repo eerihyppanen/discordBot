@@ -6,7 +6,7 @@ import { ColonistError } from '../utils/colonistSystem.js';
 export default {
   data: new SlashCommandBuilder().setName('admin').setDescription('Moderator tools')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-    .addSubcommand(command => command.setName('pubg-stats').setDescription('Set saved PUBG Steam PC statistics')
+    .addSubcommand(command => command.setName('pubg-stats').setDescription('Set manual PUBG Steam PC totals separately from recent API matches')
       .addStringOption(option => option.setName('username').setDescription('PUBG username').setMinLength(1).setMaxLength(64).setRequired(true))
       .addIntegerOption(option => option.setName('wins').setDescription('Number of wins').setMinValue(0).setRequired(true))
       .addIntegerOption(option => option.setName('matches').setDescription('Number of matches').setMinValue(1).setRequired(true)))

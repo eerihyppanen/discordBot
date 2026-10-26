@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "url";
 import { initializeData, flushLevelingData } from "./utils/levelingSystem.js";
-import { initializePubgWinsData, flushPubgWinsData } from "./utils/pubgWinsSystem.js";
+import { initializePubgWinsData, flushPubgWinsData, manualPubgStats } from "./utils/pubgWinsSystem.js";
 import { initializeColonistData, flushColonistData } from "./utils/colonistSystem.js";
 
 import { economy } from './utils/economySystem.js';
@@ -12,10 +12,13 @@ import { skins } from './utils/skinSystem.js';
 import { colonistGames } from './utils/colonistGameSystem.js';
 import { createLifecycle } from './utils/lifecycle.js';
 import { dispatchInteraction } from './utils/interactionHandler.js';
+import { profiles } from './utils/profileSystem.js';
 
 // Load data before accepting events. Existing JSON files keep their format.
 await initializeData();
 await initializePubgWinsData();
+await manualPubgStats.initialize();
+await profiles.initialize();
 await initializeColonistData();
 await economy.initialize();
 await reminders.initialize();
@@ -45,7 +48,7 @@ let heartbeat;
 let loginRetry;
 const lifecycle = createLifecycle({
   client,
-  flushers: [flushLevelingData, flushPubgWinsData, flushColonistData, economy.flush, reminders.flush, skins.flush, colonistGames.flush],
+  flushers: [flushLevelingData, flushPubgWinsData, manualPubgStats.flush, profiles.flush, flushColonistData, economy.flush, reminders.flush, skins.flush, colonistGames.flush],
   stop: async () => {
     clearInterval(heartbeat);
     clearTimeout(loginRetry);

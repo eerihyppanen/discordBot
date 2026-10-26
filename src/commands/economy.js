@@ -20,9 +20,7 @@ const command = {
       .setColor('#ffd700')
       .setTitle(`💰 ${targetUser.username}'s Balance`)
       .addFields(
-        { name: '💵 Wallet', value: `${userEconomy.coins} coins`, inline: true },
-        { name: '🏦 Bank', value: `${userEconomy.bank} coins`, inline: true },
-        { name: '💎 Total', value: `${userEconomy.coins + userEconomy.bank} coins`, inline: true }
+        { name: '💵 Wallet', value: `${userEconomy.coins} coins`, inline: true }
       )
       .setThumbnail(targetUser.displayAvatarURL())
       .setTimestamp();
