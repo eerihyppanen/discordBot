@@ -29,7 +29,6 @@ console.log('CLIENT_ID:', process.env.CLIENT_ID ? '✅ Set' : '❌ Missing');
 console.log('GUILD_ID:', process.env.GUILD_ID ? '✅ Set' : '❌ Missing');
 console.log('FACEIT_API_KEY:', process.env.FACEIT_API_KEY ? '✅ Set' : '❌ Missing');
 console.log('PUBG_API_KEY:', process.env.PUBG_API_KEY ? '✅ Set' : '❌ Missing');
-console.log('GROQ_API_KEY:', process.env.GROQ_API_KEY ? '✅ Set' : '❌ Missing');
 
 // Create a new client instance
 const client = new Client({

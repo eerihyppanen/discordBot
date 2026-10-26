@@ -97,9 +97,10 @@ export const createColonistGameSystem = (store, { recordResult = recordGameResul
       game.startedAt = now();
       return game;
     }),
-    cancel: (id, userId, context) => store.update(games => {
-      const game = checked(games, id, context);
-      if (game.creatorId !== userId) throw new ColonistError('Only the creator can cancel the game.');
+    cancel: (id, userId, context, { isModerator = false } = {}) => store.update(games => {
+      const game = checked(games, id);
+      if (!context?.guildId || game.guildId !== context.guildId) throw new ColonistError('Cancel the game in its original server.');
+      if (game.creatorId !== userId && !isModerator) throw new ColonistError('Only the creator or a moderator with Manage Server can cancel the game.');
       if (game.status === 'recording' || game.status === 'completed') throw new ColonistError('A recording or completed game cannot be cancelled.');
       game.status = 'cancelled';
       return game;

@@ -2,7 +2,7 @@ import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } 
 import { recordWinWithRewards, addLoss, getPlayerStats, ColonistError } from "../utils/colonistSystem.js";
 import { syncLevelRole } from '../utils/levelRoles.js';
 import { colonistGames } from '../utils/colonistGameSystem.js';
-import { openColonistGame, requestColonistWin, handleColonistGameButton } from '../utils/colonistGameUI.js';
+import { openColonistGame, requestColonistWin, cancelColonistGame, handleColonistGameButton } from '../utils/colonistGameUI.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -10,6 +10,7 @@ const command = {
     .setDescription('Create a Colonist game, record results and view stats')
     .addSubcommand(subcommand => subcommand.setName('game').setDescription('Open or resume a game with your friends'))
     .addSubcommand(subcommand => subcommand.setName('win').setDescription('Confirm your own win in your active game'))
+    .addSubcommand(subcommand => subcommand.setName('cancel').setDescription('Cancel your unfinished game from any channel in this server'))
     .addSubcommand(subcommand =>
       subcommand
         .setName('confirm')
@@ -38,9 +39,10 @@ const command = {
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
     
-    if (subcommand === 'game' || subcommand === 'win') {
+    if (['game', 'win', 'cancel'].includes(subcommand)) {
       try {
-        return await (subcommand === 'game' ? openColonistGame(interaction) : requestColonistWin(interaction));
+        const handler = { game: openColonistGame, win: requestColonistWin, cancel: cancelColonistGame }[subcommand];
+        return await handler(interaction);
       } catch (error) {
         if (!(error instanceof ColonistError)) throw error;
         const content = `❌ ${error.message}`;

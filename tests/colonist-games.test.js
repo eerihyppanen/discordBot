@@ -53,6 +53,43 @@ test('leaving a lobby frees a player, but the creator must cancel instead of lea
   await assert.rejects(f.games.leave(f.game.id, f.creator.id, f.context), /creator|cancel/i);
 });
 
+test('creator can recover a game from another channel and free every participant', async () => {
+  const f = await fixture();
+  await f.games.join(f.game.id, f.guest, f.context);
+  await f.games.start(f.game.id, f.creator.id, f.context);
+  await f.games.cancel(f.game.id, f.creator.id, { ...f.context, channelId: 'replacement-channel' });
+  assert.equal(await f.games.activeFor(f.creator.id), null);
+  assert.equal(await f.games.activeFor(f.guest.id), null);
+  assert.equal(JSON.parse(await fs.readFile(f.file, 'utf8'))[f.game.id].status, 'cancelled');
+  await assert.rejects(f.games.start(f.game.id, f.creator.id, f.context), /lobby/i);
+  await assert.rejects(f.games.confirm(f.game.id, f.guest.id, f.context), /started/i);
+  assert.equal(await getPlayerStats(f.guest.id), null);
+});
+
+test('moderator can recover an absent creator’s game only within its server', async () => {
+  const f = await fixture();
+  await f.games.join(f.game.id, f.guest, f.context);
+  const recovery = { ...f.context, channelId: 'replacement-channel' };
+  await assert.rejects(f.games.cancel(f.game.id, f.guest.id, recovery), /creator/i);
+  await assert.rejects(f.games.cancel(f.game.id, '999', { ...recovery, guildId: 'other' }, { isModerator: true }), /server|guild/i);
+  await f.games.cancel(f.game.id, '999', recovery, { isModerator: true });
+  assert.equal(await f.games.activeFor(f.guest.id), null);
+});
+
+test('even moderators cannot cancel reserved or completed results', async () => {
+  const f = await fixture();
+  await f.games.join(f.game.id, f.guest, f.context);
+  await f.games.start(f.game.id, f.creator.id, f.context);
+  const failing = createColonistGameSystem(createJsonStore(f.file), { recordResult: async () => { throw new Error('Disk full'); } });
+  await assert.rejects(failing.confirm(f.game.id, f.guest.id, f.context), /Disk full/);
+  await assert.rejects(failing.cancel(f.game.id, '999', f.context, { isModerator: true }), /recording/i);
+  await failing.flush();
+  const restarted = createColonistGameSystem(createJsonStore(f.file));
+  await restarted.initialize();
+  await assert.rejects(restarted.cancel(f.game.id, '999', f.context, { isModerator: true }), /completed/i);
+  assert.equal((await getPlayerStats(f.guest.id)).wins, 1);
+});
+
 test('one unfinished game per participant prevents duplicate rosters and slash retries reopen it', async () => {
   const f = await fixture();
   const reopened = await f.games.create({ ...f.context, creator: f.creator, id: 'another-id' });

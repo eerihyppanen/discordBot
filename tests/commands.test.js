@@ -7,13 +7,12 @@ import { PermissionFlagsBits, MessageFlags } from 'discord.js';
 
 const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'discord-commands-'));
 process.env.DATA_DIR = directory;
-const { default: manual } = await import('../src/commands/pubg-wins-add.js');
+const { default: manual } = await import('../src/commands/admin.js');
 const { default: daily } = await import('../src/commands/daily.js');
 const { default: balance } = await import('../src/commands/economy.js');
 const { default: gamble } = await import('../src/commands/gamble.js');
 const { default: colonist } = await import('../src/commands/colonist.js');
 const { default: remind, parseTime } = await import('../src/commands/remind.js');
-const { default: groq } = await import('../src/commands/groq-chat.js');
 const { economy } = await import('../src/utils/economySystem.js');
 const { flushPubgWinsData, getPlayerWins } = await import('../src/utils/pubgWinsSystem.js');
 const { flushColonistData, getPlayerStats, addLoss, recordWinWithRewards } = await import('../src/utils/colonistSystem.js');
@@ -62,6 +61,7 @@ test('manual PUBG changes require Manage Server in metadata and execution', asyn
 
 test('authorized manual changes succeed and include an audit record', async () => {
   const admin = interaction('moderator', {
+    subcommand: 'pubg-stats',
     strings: { username: 'player', platform: 'steam', region: 'pc-eu' },
     integers: { wins: 5, matches: 10 },
   });
@@ -131,30 +131,6 @@ test('failed persistence cannot produce a daily success response', async () => {
   } finally {
     await fs.rmdir(file);
     await fs.writeFile(file, prior);
-  }
-});
-
-test('Groq command reports a retired model distinctly and caps embed size', async () => {
-  const originalFetch = globalThis.fetch;
-  const originalKey = process.env.GROQ_API_KEY;
-  const originalError = console.error;
-  process.env.GROQ_API_KEY = 'test-key';
-  console.error = () => {};
-  try {
-    const request = interaction('ai-user', { strings: { message: 'hi' } });
-    let response;
-    request.editReply = async (value) => { response = value; };
-    globalThis.fetch = async () => ({ ok: false, status: 400, json: async () => ({ error: { code: 'model_decommissioned' } }) });
-    await groq.execute(request);
-    assert.match(response, /GROQ_MODEL/);
-    globalThis.fetch = async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: 'x'.repeat(5000) } }] }) });
-    await groq.execute(request);
-    assert.equal(response.embeds[0].toJSON().description.length, 4096);
-  } finally {
-    globalThis.fetch = originalFetch;
-    console.error = originalError;
-    if (originalKey === undefined) delete process.env.GROQ_API_KEY;
-    else process.env.GROQ_API_KEY = originalKey;
   }
 });
 
@@ -276,8 +252,9 @@ test('a response failure after a saved win does not tell the user to record it a
 });
 
 test('manual PUBG changes use the same Steam record as automatic PC lookups', async () => {
-  assert.deepEqual(manual.data.toJSON().options.map(option => option.name), ['username', 'wins', 'matches']);
+  assert.deepEqual(manual.data.toJSON().options.find(option => option.name === 'pubg-stats').options.map(option => option.name), ['username', 'wins', 'matches']);
   const admin = interaction('pc-moderator', {
+    subcommand: 'pubg-stats',
     strings: { username: 'PCPlayer', platform: 'xbox', region: 'console' },
     integers: { wins: 7, matches: 20 },
   });

@@ -1,7 +1,7 @@
 # Discord Bot
 
 A Discord bot for a gaming community: PUBG Steam PC statistics, Colonist results,
-legendary skin collections, XP and roles, virtual coins, reminders, and Groq chat.
+legendary skin collections, XP and roles, virtual coins, and reminders.
 
 ## Development
 
@@ -22,8 +22,6 @@ Keep credentials out of Git and do not share `.env`.
 | `DATA_DIR` | Persistent JSON directory; defaults to `data` in the working directory |
 | `PUBG_API_KEY` | PUBG commands |
 | `FACEIT_API_KEY` | FACEIT command |
-| `GROQ_API_KEY` | Groq chat |
-| `GROQ_MODEL` | Optional model selection; defaults to `openai/gpt-oss-20b` |
 | `CHANNEL_NAME` | Optional welcome channel name |
 | `MEME_URL` | Optional image for customizing welcome messages |
 
@@ -65,17 +63,20 @@ current subcommands, required and optional parameters, and available choices.
 
 | Area | Commands |
 | --- | --- |
-| PUBG Steam PC | `/pubg username`, `/pubg-wins username`, `/pubg-leaderboard` |
-| Manual PUBG statistics | `/pubg-wins-add username wins matches` (Manage Server required) |
+| PUBG Steam PC | `/pubg stats username [view]`, `/pubg leaderboard` |
+| Moderator tools | `/admin pubg-stats username wins matches`, `/admin colonist-cancel player` (Manage Server required) |
 | Other games | `/faceit username`, `/colonist game`, `/colonist win`, `/colonist stats`, `/colonist-leaderboard` |
 | Legendary skins | `/lege add`, `/lege undo`, `/lege count`, `/lege list`, `/lege leaderboard` |
 | XP | `/level`, `/leaderboard` |
 | Virtual economy | `/balance`, `/daily`, `/gamble coinflip`, `/gamble slots`, `/gamble dice` |
-| Other | `/remind time message`, `/groq message`, `/8ball question`, `/help` |
+| Other | `/remind time message`, `/8ball question`, `/help` |
 
 PUBG lookups and manual statistics both use Steam PC player records; platform and
 region inputs are no longer required. Recent PUBG statistics cover up to the last
-20 available matches, not lifetime totals.
+20 available matches, not lifetime totals. `/pubg stats` defaults to the recent-match
+summary and refreshes the saved ranking; `view:last` shows the latest match's details
+without changing the ranking. `/admin pubg-stats` sets the same saved snapshot;
+a later recent-match lookup replaces it with API statistics.
 
 ### Correcting and browsing legendary skins
 
@@ -115,7 +116,7 @@ synchronize the member's level role; a later message can retry a missed update.
 
 No admin approval or user-entered match ID is needed. This is a trusted friend-group
 report, not automatic verification with Colonist.io. Outsiders and bots cannot
-claim a result. Only the creator starts/cancels a game; join/leave controls lock
+claim a result. Only the creator starts a game; join/leave controls lock
 on start, and a result being saved cannot be cancelled or assigned to a second winner.
 Each player can participate in one unfinished game at a time.
 
@@ -129,14 +130,23 @@ lost. Interrupted result saves recover at startup, or the reserved winner can
 retry the same confirmation. Receipts prevent duplicate wins, losses or rewards.
 Closing the private confirmation with **Takaisin** does not change the game.
 
+The creator can use `/colonist cancel` from **any channel in the original server**,
+including when the original channel or message was deleted. A moderator with Manage
+Server can use `/admin colonist-cancel player:@Participant` to recover an abandoned
+game even when its creator is unavailable, or press **Peruuta** on the game card.
+Cancellation frees every participant without recording results. Only lobby or
+playing games can be cancelled; a result already being saved must finish recovery.
+Refreshing the old card is best effort and never undoes a saved cancellation.
+
 The optional legacy moderator fallback is now `/colonist confirm winner:@Player
 match:game-123456`. It retains the Manage Server permission, external match-ID
 and anti-self-confirmation checks for manually confirmed results. Ordinary games
 use the button flow. `/colonist loss` remains available for standalone losses,
 but is blocked while the caller belongs to an active game, whose losses are automatic.
 
-Re-register slash commands after upgrading: `/colonist game` is new, `/colonist win`
-no longer takes a winner/match input, and the old moderator flow moved to `confirm`.
+Re-register slash commands after upgrading. The consolidated `/pubg` and `/admin`
+commands replace `/pubg-wins`, `/pubg-leaderboard`, and `/pubg-wins-add`.
+Groq chat has been removed; its environment variables are no longer used.
 Back up and restore the entire data directory together, including game sessions,
 rather than restoring individual reward files.
 

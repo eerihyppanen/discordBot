@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { MessageFlags } from 'discord.js';
+import { MessageFlags, PermissionFlagsBits } from 'discord.js';
 const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'colonist-game-ui-'));
 process.env.DATA_DIR = dir;
 const { default: command } = await import('../src/commands/colonist.js');
@@ -67,6 +67,76 @@ test('a normal member creates a persistent game card without an admin permission
   const metadata = command.data.toJSON().options;
   assert.ok(metadata.some(option => option.name === 'game'));
   assert.deepEqual(metadata.find(option => option.name === 'win').options || [], []);
+});
+
+test('/colonist cancel recovers from a deleted channel and acknowledges a durable cancellation', async t => {
+  const f = await setup('210');
+  const item = request(f.creator, 'cancel');
+  item.r.channelId = 'replacement-channel';
+  let flags;
+  item.r.deferReply = async options => { flags = options.flags; item.r.deferred = true; };
+  item.r.client.channels = { fetch: async () => { throw new Error('Unknown Channel'); } };
+  t.mock.method(console, 'error', () => {});
+  t.mock.method(console, 'info', () => {});
+  await command.execute(item.r);
+  assert.equal(flags, MessageFlags.Ephemeral);
+  assert.match(item.output.edit.content, /^✅/);
+  assert.equal(await colonistGames.activeFor(f.creator), null);
+  assert.equal(await colonistGames.activeFor(f.guest), null);
+  assert.equal(await getPlayerStats(f.guest), null);
+});
+
+test('an ordinary participant cannot cancel someone else’s game through slash recovery', async () => {
+  const f = await setup('220');
+  const item = request(f.guest, 'cancel');
+  await command.execute(item.r);
+  assert.match(item.output.edit.content, /creator/);
+  assert.equal((await colonistGames.get(f.game.id)).status, 'playing');
+});
+
+test('/admin colonist-cancel recovers by participant when the creator is absent', async t => {
+  const { default: admin } = await import('../src/commands/admin.js');
+  const f = await setup('230');
+  const item = request('9999', 'colonist-cancel');
+  item.r.channelId = 'replacement-channel';
+  item.r.options.getUser = () => ({ id: f.guest, bot: false });
+  item.r.memberPermissions = { has: permission => permission === PermissionFlagsBits.ManageGuild };
+  item.r.client.channels = { fetch: async id => {
+    assert.equal(id, f.game.channelId);
+    return item.r.channel;
+  } };
+  t.mock.method(console, 'info', () => {});
+  await admin.execute(item.r);
+  assert.match(item.output.edit.content, /^✅/);
+  assert.equal(item.output.publicEdits.length, 1);
+  assert.deepEqual(item.output.publicEdits[0].components, []);
+  assert.equal(await colonistGames.activeFor(f.guest), null);
+});
+
+test('/admin recovery checks runtime permissions before reading options and rejects another server', async () => {
+  const { default: admin } = await import('../src/commands/admin.js');
+  const denied = request('9999', 'colonist-cancel');
+  denied.r.options = null;
+  await admin.execute(denied.r);
+  assert.equal(denied.output.reply.flags, MessageFlags.Ephemeral);
+  assert.match(denied.output.reply.content, /Manage Server/);
+  const f = await setup('240');
+  const other = request('9999', 'colonist-cancel');
+  other.r.guildId = 'other';
+  other.r.memberPermissions = { has: () => true };
+  other.r.options.getUser = () => ({ id: f.guest });
+  await admin.execute(other.r);
+  assert.match(other.output.edit.content, /server/);
+  assert.equal((await colonistGames.get(f.game.id)).status, 'playing');
+});
+
+test('a moderator can cancel with the public button even without being a participant', async () => {
+  const f = await setup('250');
+  const item = button(f.game.id, '9999', 'cancel');
+  item.r.memberPermissions = { has: permission => permission === PermissionFlagsBits.ManageGuild };
+  await command.handleButton(item.r);
+  assert.deepEqual(item.output.edit.components, []);
+  assert.equal(await colonistGames.activeFor(f.creator), null);
 });
 
 test('claiming a win privately confirms it before recording all results and updating the public card', async () => {

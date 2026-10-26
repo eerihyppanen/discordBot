@@ -27,12 +27,14 @@ test('general help reflects the live registry and counts each command exactly on
   const text = JSON.stringify(output);
   assert.match(text, /new-command/);
   assert.doesNotMatch(text, /play-simple/);
-  assert.match(output.footer.text, /Total Commands: 18\b/);
+  assert.match(output.footer.text, /Total Commands: 15\b/);
+  for (const removed of ['groq', 'pubg-wins', 'pubg-leaderboard', 'pubg-wins-add']) assert.equal(registry.has(removed), false);
   for (const name of registry.keys()) assert.ok(output.fields.some(field => field.name === '/' + name), name);
 });
 
 test('detailed help uses current required inputs, optional inputs, choices and subcommands', async () => {
-  const manual = JSON.stringify(await show('pubg-wins-add'));
+  const manual = JSON.stringify(await show('admin'));
+  assert.match(manual, /\/admin pubg-stats/);
   assert.match(manual, /<username>/);
   assert.match(manual, /<wins>/);
   assert.match(manual, /<matches>/);

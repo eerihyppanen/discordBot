@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { colonistGames } from './colonistGameSystem.js';
 import { ColonistError } from './colonistSystem.js';
 import { syncLevelRole } from './levelRoles.js';
@@ -78,6 +78,28 @@ export const requestColonistWin = async interaction => {
   return interaction.reply({ ...confirmation(game, interaction.user.id), flags: MessageFlags.Ephemeral });
 };
 
+// Cancellation is durable before attempting to refresh a possibly deleted card.
+export const cancelColonistGame = async (interaction, player = interaction.user) => {
+  humanInGuild(interaction);
+  if (!player || player.bot) throw new ColonistError('Select a human participant.');
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const active = await colonistGames.activeFor(player.id);
+  if (!active) throw new ColonistError('Tällä pelaajalla ei ole keskeneräistä peliä.');
+  const game = await colonistGames.cancel(active.id, interaction.user.id, contextFor(interaction), {
+    isModerator: interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ?? false,
+  });
+  console.info('Colonist game cancelled:', { gameId: game.id, actorId: interaction.user.id, guildId: interaction.guildId });
+  const updates = [
+    Promise.resolve().then(() => interaction.editReply({ content: '✅ Peli peruutettu. Pelaajat voivat aloittaa uuden pelin.', embeds: [], components: [] })),
+    publishGame(game.id, async current => {
+      if (!current.messageId) return;
+      const channel = current.channelId === interaction.channelId ? interaction.channel : await interaction.client.channels.fetch(current.channelId);
+      if (channel?.messages) await channel.messages.edit(current.messageId, renderColonistGame(current));
+    }),
+  ];
+  for (const result of await Promise.allSettled(updates)) if (result.status === 'rejected') console.error('Game cancelled, but Discord update failed:', result.reason);
+};
+
 export const handleColonistGameButton = async interaction => {
   let action, game;
   try {
@@ -107,7 +129,15 @@ export const handleColonistGameButton = async interaction => {
       return;
     }
     const actor = action === 'join' ? interaction.user : interaction.user.id;
-    game = await colonistGames[action](id, actor, context);
+    game = await colonistGames[action](id, actor, context, { isModerator: interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ?? false });
+    if (action === 'cancel') {
+      try { await publishGame(game.id, current => interaction.editReply(renderColonistGame(current))); }
+      catch (error) {
+        console.error('Game cancelled, but Discord update failed:', error);
+        await interaction.followUp({ content: '✅ Peli peruutettu. Pelaajat voivat aloittaa uuden pelin.', flags: MessageFlags.Ephemeral });
+      }
+      return;
+    }
     return await publishGame(game.id, current => interaction.editReply(renderColonistGame(current)));
   } catch (error) {
     if (!(error instanceof ColonistError)) console.error('Colonist game interaction failed:', error);

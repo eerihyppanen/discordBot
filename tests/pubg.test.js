@@ -10,7 +10,6 @@ const originalKey = process.env.PUBG_API_KEY;
 process.env.DATA_DIR = dir;
 process.env.PUBG_API_KEY = 'offline-test-key';
 const { default: pubg } = await import('../src/commands/pubg.js');
-const { default: wins } = await import('../src/commands/pubg-wins.js');
 const { getPlayerWins, flushPubgWinsData } = await import('../src/utils/pubgWinsSystem.js');
 after(async () => {
   await flushPubgWinsData();
@@ -19,15 +18,15 @@ after(async () => {
   await fs.rm(dir, { recursive: true, force: true });
 });
 
-const run = async (command, username = 'Player') => {
+const run = async (view, username = 'Player', subcommand = 'stats') => {
   let reply;
   const request = {
     // Stale registered console options must never redirect a PC lookup.
-    options: { getString: name => ({ username, platform: 'xbox', region: 'console' })[name] },
+    options: { getSubcommand: () => subcommand, getString: name => ({ username, view, platform: 'xbox', region: 'console' })[name] },
     deferReply: async () => {},
     editReply: async payload => { reply = payload.embeds ? payload.embeds[0].toJSON() : payload; },
   };
-  await command.execute(request);
+  await pubg.execute(request);
   return reply;
 };
 const response = data => ({ ok: true, status: 200, json: async () => data });
@@ -37,9 +36,11 @@ const match = { included: [{ type: 'participant', attributes: { stats: {
   timeSurvived: 600, longestKill: 50, walkDistance: 1500,
 } } }] };
 
-for (const command of [pubg, wins]) {
-  test(`${command.data.name} queries only Steam PC and publishes the returned stats`, async t => {
-    assert.deepEqual(command.data.toJSON().options.map(option => option.name), ['username']);
+for (const view of ['last', 'recent']) {
+  test(`/pubg stats view:${view} queries only Steam PC and publishes the returned stats`, async t => {
+    const definition = pubg.data.toJSON();
+    assert.deepEqual(definition.options.map(option => option.name), ['stats', 'leaderboard']);
+    assert.deepEqual(definition.options[0].options.map(option => option.name), ['username', 'view']);
     const urls = [];
     t.mock.method(globalThis, 'fetch', async (url, options) => {
       urls.push(url);
@@ -47,11 +48,11 @@ for (const command of [pubg, wins]) {
       assert.ok(options.signal instanceof AbortSignal);
       return response(url.includes('/players?') ? { data: [player] } : match);
     });
-    const reply = await run(command, 'Player & Other');
+    const reply = await run(view, 'Player & Other');
     assert.equal(urls.length, 2);
     assert.equal(new URL(urls[0]).searchParams.get('filter[playerNames]'), 'Player & Other');
     assert.equal(new URL(urls[1]).pathname, '/shards/steam/matches/match-1');
-    if (command === pubg) {
+    if (view === 'last') {
       assert.equal(reply.fields.find(field => field.name === 'Platform').value, 'STEAM');
       assert.equal(reply.fields.find(field => field.name === 'Kills').value, '3');
     } else {
@@ -63,18 +64,31 @@ for (const command of [pubg, wins]) {
     }
   });
 
-  test(`${command.data.name} stops after a PC player is not found`, async t => {
+  test(`/pubg stats view:${view} stops after a PC player is not found`, async t => {
     let calls = 0;
     t.mock.method(globalThis, 'fetch', async () => { calls++; return { ok: false, status: 404 }; });
-    assert.match(await run(command), /Player not found/);
+    assert.match(await run(view), /Player not found/);
     assert.equal(calls, 1);
   });
 
-  test(`${command.data.name} reports service failures without trying other platforms`, async t => {
+  test(`/pubg stats view:${view} reports service failures without trying other platforms`, async t => {
     let calls = 0;
     t.mock.method(console, 'error', () => {});
     t.mock.method(globalThis, 'fetch', async () => { calls++; return { ok: false, status: 401 }; });
-    assert.match(await run(command), /Error fetching PUBG/);
+    assert.match(await run(view), /Error fetching PUBG/);
     assert.equal(calls, 1);
   });
 }
+
+test('/pubg stats defaults to recent and /pubg leaderboard reads saved statistics without an API key', async t => {
+  t.mock.method(globalThis, 'fetch', async url => response(url.includes('/players?') ? { data: [player] } : match));
+  const stats = await run(null);
+  assert.match(stats.title, /Win Statistics/);
+  delete process.env.PUBG_API_KEY;
+  try {
+    t.mock.method(globalThis, 'fetch', async () => { throw new Error('Leaderboard must not query the API'); });
+    const leaderboard = await run(null, null, 'leaderboard');
+    assert.match(leaderboard.title, /Leaderboard/);
+    assert.match(leaderboard.description, /Player/);
+  } finally { process.env.PUBG_API_KEY = 'offline-test-key'; }
+});
