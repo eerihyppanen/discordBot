@@ -28,7 +28,8 @@ const getOrCreatePlayer = (players, userId, username) => {
 };
 
 const unfinishedReward = async (players, userId) => (await economy.getColonistRewards())
-  .find(receipt => receipt.userId === userId && !players[userId]?.recordedMatches?.[receipt.matchId]);
+  .find(receipt => (receipt.userId === userId || receipt.participants?.some(player => player.id === userId)) &&
+    !players[receipt.userId]?.recordedMatches?.[receipt.matchId]);
 
 const stageWin = (players, userId, username, now = Date.now()) => {
   const player = getOrCreatePlayer(players, userId, username);
@@ -68,7 +69,7 @@ export const recordWinWithRewards = async (userId, username, { matchId, confirme
     if (!previous && await unfinishedReward(players, userId)) {
       throw new ColonistError('Finish confirming the previous match with its original ID before recording another result.');
     }
-    const lastWin = Date.parse(players[userId]?.lastWinDate || '');
+    const lastWin = Date.parse(players[userId]?.lastRewardAt ?? players[userId]?.lastWinDate ?? '');
     if (!previous && Number.isFinite(lastWin) && now - lastWin < WIN_COOLDOWN_MS) {
       throw new ColonistError('This player can receive one confirmed win every 30 minutes.');
     }
@@ -80,12 +81,14 @@ export const recordWinWithRewards = async (userId, username, { matchId, confirme
       Object.assign(result, previous.stats);
       result.streakMultiplier = Math.floor(result.currentStreak / 3);
     }
+    players[userId].lastRewardAt = new Date(previous?.at ?? now).toISOString();
+    result.lastRewardAt = players[userId].lastRewardAt;
     const receipt = previous || {
       matchId: key, userId, username, confirmedBy, guildId, at: now,
       xpReward: result.xpReward, coinReward: result.coinReward,
       stats: {
         wins: result.wins, totalGames: result.totalGames, currentStreak: result.currentStreak,
-        longestStreak: result.longestStreak, lastWinDate: result.lastWinDate,
+        longestStreak: result.longestStreak, lastWinDate: result.lastWinDate, lastRewardAt: result.lastRewardAt,
       },
     };
     result.xpReward = receipt.xpReward;
@@ -104,15 +107,89 @@ export const recordWinWithRewards = async (userId, username, { matchId, confirme
   return outcome;
 };
 
+const statsSnapshot = (player) => Object.fromEntries(
+  ['username', 'wins', 'totalGames', 'currentStreak', 'longestStreak', 'lastWinDate', 'lastRewardAt']
+    .filter(name => player[name] !== undefined).map(name => [name, player[name]]),
+);
+
+// The game service reserves a winner durably before calling this operation.
+export const recordGameResult = async ({ id, guildId, players: participants, winnerId, finishedAt }) => {
+  if (typeof id !== 'string' || !/^[a-z0-9_-]{6,100}$/i.test(id) || !guildId ||
+      !Array.isArray(participants) || participants.length < 2 || participants.length > 8 ||
+      participants.some(player => !/^\d{1,20}$/.test(player.id) || typeof player.username !== 'string' || !player.username.trim()) ||
+      new Set(participants.map(player => player.id)).size !== participants.length ||
+      !participants.some(player => player.id === winnerId) || !Number.isSafeInteger(finishedAt) || finishedAt < 0) {
+    throw new ColonistError('Invalid game result.');
+  }
+  const key = `game:${id}`;
+  const outcome = await store.update(async (players) => {
+    const previous = await economy.getColonistReward(key);
+    if (previous && (previous.source !== 'discord-game' || previous.userId !== winnerId || previous.guildId !== guildId ||
+        previous.participants.map(player => player.id).sort().join(',') !== participants.map(player => player.id).sort().join(','))) {
+      throw new ColonistError('This game already has a different recorded result.');
+    }
+    const alreadyRecorded = Boolean(players[winnerId]?.recordedMatches?.[key]);
+    let receipt = previous;
+    if (!receipt) {
+      for (const participant of participants) {
+        if (await unfinishedReward(players, participant.id)) throw new ColonistError('Finish the previous pending game before recording another result.');
+      }
+      const winner = participants.find(player => player.id === winnerId);
+      const oldStats = getOrCreatePlayer(players, winnerId, winner.username);
+      const lastRewardAt = oldStats.lastRewardAt ?? oldStats.lastWinDate;
+      const lastRewardTime = Date.parse(lastRewardAt || '');
+      const rewarded = !Number.isFinite(lastRewardTime) || finishedAt - lastRewardTime >= WIN_COOLDOWN_MS;
+      const result = stageWin(players, winnerId, winner.username, finishedAt);
+      players[winnerId].lastRewardAt = rewarded ? new Date(finishedAt).toISOString() : lastRewardAt;
+      for (const participant of participants) {
+        if (participant.id === winnerId) continue;
+        const loser = getOrCreatePlayer(players, participant.id, participant.username);
+        loser.username = participant.username;
+        loser.totalGames += 1;
+        loser.currentStreak = 0;
+      }
+      receipt = {
+        source: 'discord-game', matchId: key, gameId: id, guildId, userId: winnerId,
+        username: winner.username, confirmedBy: winnerId, at: finishedAt,
+        participants, rewarded, xpReward: rewarded ? result.xpReward : 0,
+        coinReward: rewarded ? result.coinReward : 0,
+        statsByUser: Object.fromEntries(participants.map(player => [player.id, statsSnapshot(players[player.id])])),
+      };
+    }
+    let newBalance;
+    if (!alreadyRecorded) {
+      // Restore all snapshots after a crash, including losses that were only batched before the game.
+      for (const participant of receipt.participants) {
+        Object.assign(getOrCreatePlayer(players, participant.id, participant.username), receipt.statsByUser[participant.id]);
+      }
+      await addXP(winnerId, receipt.xpReward, {
+        rewardId: key,
+        beforeCommit: async () => { newBalance = await economy.grantColonistReward(receipt); },
+      });
+      await flushLevelingData();
+      for (const participant of receipt.participants) (players[participant.id].recordedMatches ??= {})[key] = true;
+    } else {
+      newBalance = (await economy.getBalance(winnerId)).coins;
+    }
+    return { winnerId, rewarded: receipt.rewarded, xpReward: receipt.xpReward, coinReward: receipt.coinReward, newBalance, alreadyRecorded };
+  });
+  await store.flush();
+  return outcome;
+};
+
 export const initializeColonistData = async () => {
   await store.initialize();
   const players = await store.read();
   const receipts = (await economy.getColonistRewards()).sort((a, b) => a.at - b.at);
   for (const receipt of receipts) {
     if (players[receipt.userId]?.recordedMatches?.[receipt.matchId]) continue;
-    await recordWinWithRewards(receipt.userId, receipt.username, {
-      ...receipt, matchId: receipt.matchId.slice('match:'.length), now: receipt.at,
-    });
+    if (receipt.source === 'discord-game') {
+      await recordGameResult({ id: receipt.gameId, guildId: receipt.guildId, players: receipt.participants, winnerId: receipt.userId, finishedAt: receipt.at });
+    } else {
+      await recordWinWithRewards(receipt.userId, receipt.username, {
+        ...receipt, matchId: receipt.matchId.slice('match:'.length), now: receipt.at,
+      });
+    }
   }
 };
 

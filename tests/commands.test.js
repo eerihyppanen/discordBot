@@ -25,16 +25,16 @@ after(async () => {
 });
 
 const interaction = (userId, { strings = {}, integers = {}, subcommand } = {}) => ({
-  user: { id: subcommand === 'win' ? 'moderator' : userId, username: userId, displayAvatarURL: () => 'https://example.com/avatar.png' },
+  user: { id: subcommand === 'confirm' ? 'moderator' : userId, username: userId, displayAvatarURL: () => 'https://example.com/avatar.png' },
   guildId: 'guild',
   guild: { members: { fetch: async id => ({ id }) } },
   channelId: 'channel',
   inGuild: () => true,
-  memberPermissions: { has: () => subcommand === 'win' },
+  memberPermissions: { has: () => subcommand === 'confirm' },
   options: {
-    getString: (key) => strings[key] ?? (subcommand === 'win' && key === 'match' ? userId + '-match' : null),
+    getString: (key) => strings[key] ?? (subcommand === 'confirm' && key === 'match' ? userId + '-match' : null),
     getInteger: (key) => integers[key] ?? null,
-    getUser: (key) => subcommand === 'win' && key === 'winner'
+    getUser: (key) => subcommand === 'confirm' && key === 'winner'
       ? { id: userId, username: userId, displayAvatarURL: () => 'https://example.com/avatar.png' } : null,
     getSubcommand: () => subcommand,
   },
@@ -79,7 +79,7 @@ test('daily, balance, and Colonist commands preserve concurrent economy changes'
   await Promise.all([
     daily.execute(interaction('daily-user')),
     balance.execute(interaction('balance-user')),
-    colonist.execute(interaction('colonist-user', { subcommand: 'win' })),
+    colonist.execute(interaction('colonist-user', { subcommand: 'confirm' })),
   ]);
   const saved = JSON.parse(await fs.readFile(path.join(directory, 'economy.json'), 'utf8'));
   assert.ok(saved['daily-user'].coins >= 200);
@@ -183,7 +183,7 @@ test('failed Colonist coin writes leave no win or XP and a retry grants rewards 
   await getUserLevel(userId);
   await flushLevelingData();
   let response;
-  const request = interaction(userId, { subcommand: 'win' });
+  const request = interaction(userId, { subcommand: 'confirm' });
   request.editReply = async (value) => { response = value; };
   await withFailedEconomyWrite(() => quietlyRecordWin(request));
   assert.match(response, /Retry with the same match ID/);
@@ -207,7 +207,7 @@ test('failed Colonist coin writes leave no win or XP and a retry grants rewards 
 
 test('failed Colonist rewards preserve an existing streak and its next bonus', async () => {
   const userId = 'colonist-streak-user';
-  const request = interaction(userId, { subcommand: 'win' });
+  const request = interaction(userId, { subcommand: 'confirm' });
   await recordWinWithRewards(userId, userId, { matchId: 'streak-first', confirmedBy: 'moderator', guildId: 'guild', now: Date.now() - 62 * 60_000 });
   await recordWinWithRewards(userId, userId, { matchId: 'streak-second', confirmedBy: 'moderator', guildId: 'guild', now: Date.now() - 31 * 60_000 });
   await addXP(userId, 250);
@@ -229,7 +229,7 @@ test('failed Colonist rewards preserve an existing streak and its next bonus', a
   assert.equal((await economy.getBalance(userId)).coins, 450);
 });
 
-test('a failed win preserves concurrent message XP and a queued loss', async () => {
+test('a failed win preserves concurrent message XP and a queued loss', { timeout: 10000 }, async () => {
   const userId = 'colonist-concurrent-user';
   await economy.getBalance(userId);
   const originalGrant = economy.grantColonistReward;
@@ -240,7 +240,7 @@ test('a failed win preserves concurrent message XP and a queued loss', async () 
   economy.grantColonistReward = async (...args) => { entered(); await gate; return originalGrant(...args); };
   try {
     await withFailedEconomyWrite(async () => {
-      const win = quietlyRecordWin(interaction(userId, { subcommand: 'win' }));
+      const win = quietlyRecordWin(interaction(userId, { subcommand: 'confirm' }));
       await waiting;
       const message = addXP(userId, 15);
       const loss = addLoss(userId, userId);
@@ -261,7 +261,7 @@ test('a failed win preserves concurrent message XP and a queued loss', async () 
 
 test('a response failure after a saved win does not tell the user to record it again', async () => {
   const userId = 'colonist-response-user';
-  const request = interaction(userId, { subcommand: 'win' });
+  const request = interaction(userId, { subcommand: 'confirm' });
   let response;
   request.editReply = async (value) => {
     if (typeof value !== 'string') throw new Error('Discord reply failed');

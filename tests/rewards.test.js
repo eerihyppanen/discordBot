@@ -95,11 +95,11 @@ const makeRequest = () => ({
   user: { id: 'moderator', toString: () => '<@moderator>' },
   guildId: 'guild', inGuild: () => true,
   memberPermissions: { has: permission => permission === PermissionFlagsBits.ManageGuild },
-  options: { getSubcommand: () => 'win', getString: () => 'role-match', getUser: () => winner },
+  options: { getSubcommand: () => 'confirm', getString: () => 'role-match', getUser: () => winner },
   reply: async () => {}, deferReply: async () => {}, editReply: async () => {},
 });
 
-test('Colonist win checks moderator permission, guild, human winner and self-confirmation before saving', async () => {
+test('Legacy Colonist confirmation checks moderator permission, guild, human winner and self-confirmation before saving', async () => {
   for (const configure of [
     r => { r.memberPermissions.has = () => false; },
     r => { r.inGuild = () => false; },

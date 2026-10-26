@@ -9,6 +9,7 @@ import { initializeColonistData, flushColonistData } from "./utils/colonistSyste
 import { economy } from './utils/economySystem.js';
 import { reminders } from './utils/reminderSystem.js';
 import { skins } from './utils/skinSystem.js';
+import { colonistGames } from './utils/colonistGameSystem.js';
 import { createLifecycle } from './utils/lifecycle.js';
 import { dispatchInteraction } from './utils/interactionHandler.js';
 
@@ -19,6 +20,7 @@ await initializeColonistData();
 await economy.initialize();
 await reminders.initialize();
 await skins.initialize();
+await colonistGames.initialize();
 
 // Debug environment variables
 console.log('🔍 Environment Check:');
@@ -44,7 +46,7 @@ let heartbeat;
 let loginRetry;
 const lifecycle = createLifecycle({
   client,
-  flushers: [flushLevelingData, flushPubgWinsData, flushColonistData, economy.flush, reminders.flush, skins.flush],
+  flushers: [flushLevelingData, flushPubgWinsData, flushColonistData, economy.flush, reminders.flush, skins.flush, colonistGames.flush],
   stop: async () => {
     clearInterval(heartbeat);
     clearTimeout(loginRetry);

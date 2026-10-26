@@ -1,14 +1,18 @@
 import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } from "discord.js";
 import { recordWinWithRewards, addLoss, getPlayerStats, ColonistError } from "../utils/colonistSystem.js";
 import { syncLevelRole } from '../utils/levelRoles.js';
+import { colonistGames } from '../utils/colonistGameSystem.js';
+import { openColonistGame, requestColonistWin, handleColonistGameButton } from '../utils/colonistGameUI.js';
 
 const command = {
   data: new SlashCommandBuilder()
     .setName('colonist')
-    .setDescription('Track Colonist.io game results and view stats')
+    .setDescription('Create a Colonist game, record results and view stats')
+    .addSubcommand(subcommand => subcommand.setName('game').setDescription('Open or resume a game with your friends'))
+    .addSubcommand(subcommand => subcommand.setName('win').setDescription('Confirm your own win in your active game'))
     .addSubcommand(subcommand =>
       subcommand
-        .setName('win')
+        .setName('confirm')
         .setDescription('Moderator: confirm another player’s win and rewards')
         .addUserOption(option => option.setName('winner').setDescription('The winning server member (not yourself)').setRequired(true))
         .addStringOption(option => option.setName('match').setDescription('Unique Colonist match ID').setMinLength(6).setMaxLength(100).setRequired(true))
@@ -29,10 +33,21 @@ const command = {
         )
     ),
   
+  handleButton: handleColonistGameButton,
+
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
     
-    if (subcommand === 'win') {
+    if (subcommand === 'game' || subcommand === 'win') {
+      try {
+        return await (subcommand === 'game' ? openColonistGame(interaction) : requestColonistWin(interaction));
+      } catch (error) {
+        if (!(error instanceof ColonistError)) throw error;
+        const content = `❌ ${error.message}`;
+        return interaction.deferred ? interaction.editReply({ content, embeds: [], components: [] }) : interaction.reply({ content, flags: MessageFlags.Ephemeral });
+      }
+    }
+    if (subcommand === 'confirm') {
       if (!interaction.inGuild() || !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
         return interaction.reply({ content: '❌ A moderator with Manage Server must confirm the win.', flags: MessageFlags.Ephemeral });
       }
@@ -98,6 +113,9 @@ const command = {
       }
       
     } else if (subcommand === 'loss') {
+      if (await colonistGames.activeFor(interaction.user.id)) {
+        return interaction.reply({ content: '❌ Käynnissä olevan pelin häviöt kirjataan automaattisesti. Voittaja vahvistaa pelin tuloksen.', flags: MessageFlags.Ephemeral });
+      }
       await interaction.deferReply();
       
       try {
@@ -162,7 +180,7 @@ const command = {
             { name: '📅 Last Win', value: stats.lastWinDate ? `<t:${Math.floor(new Date(stats.lastWinDate).getTime() / 1000)}:R>` : 'Never', inline: true }
           )
           .setThumbnail(targetUser.displayAvatarURL())
-          .setFooter({ text: 'Use /colonist win or /colonist loss to track games' })
+          .setFooter({ text: 'Use /colonist game to play and record results with friends' })
           .setTimestamp();
         
         await interaction.editReply({ embeds: [embed] });

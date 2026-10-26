@@ -58,7 +58,7 @@ for (const source of ['chat', 'colonist']) {
       await colonist.execute({
         user: { id: '800000000000000000' }, guild, guildId: guild.id,
         inGuild: () => true, memberPermissions: { has: () => true },
-        options: { getSubcommand: () => 'win', getUser: () => member.user, getString: () => 'cache-delay-match' },
+        options: { getSubcommand: () => 'confirm', getUser: () => member.user, getString: () => 'cache-delay-match' },
         deferReply: async () => {}, editReply: async () => {},
       });
     }

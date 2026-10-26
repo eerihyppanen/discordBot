@@ -2,12 +2,13 @@ import { MessageFlags } from 'discord.js';
 
 export const dispatchInteraction = async (interaction) => {
   const skinButton = interaction.isButton() && interaction.customId.startsWith('lege:list:');
-  if (!skinButton && !interaction.isChatInputCommand()) return;
-  const name = skinButton ? 'lege' : interaction.commandName;
+  const colonistButton = interaction.isButton() && interaction.customId.startsWith('colonist:game:');
+  if (!skinButton && !colonistButton && !interaction.isChatInputCommand()) return;
+  const name = skinButton ? 'lege' : colonistButton ? 'colonist' : interaction.commandName;
   const command = interaction.client.commands.get(name);
   try {
     if (!command) throw new Error(`No command matching ${name} was found.`);
-    if (skinButton) await command.handleButton(interaction);
+    if (skinButton || colonistButton) await command.handleButton(interaction);
     else await command.execute(interaction);
   } catch (error) {
     console.error(`Error executing ${name}:`, error);
