@@ -189,7 +189,7 @@ test('failed Colonist coin writes leave no win or XP and a retry grants rewards 
   assert.equal(stats.wins, 1);
   assert.equal(stats.totalGames, 1);
   assert.equal(stats.currentStreak, 1);
-  assert.equal((await getUserLevel(userId)).xp, 50);
+  assert.equal((await getUserLevel(userId)).xp, 100);
   assert.equal((await economy.getBalance(userId)).coins, 200);
 });
 
@@ -212,7 +212,7 @@ test('failed Colonist rewards preserve an existing streak and its next bonus', a
   assert.equal(stats.totalGames, 3);
   assert.equal(stats.currentStreak, 3);
   assert.equal(stats.longestStreak, 3);
-  assert.equal((await getUserLevel(userId)).xp, 425);
+  assert.equal((await getUserLevel(userId)).xp, 600);
   assert.equal((await getUserLevel(userId)).level, 2);
   assert.equal((await economy.getBalance(userId)).coins, 450);
 });
@@ -259,7 +259,7 @@ test('a response failure after a saved win does not tell the user to record it a
   assert.match(response, /already.*recorded/i);
   assert.doesNotMatch(response, /try again/i);
   assert.equal((await getPlayerStats(userId)).wins, 1);
-  assert.equal((await getUserLevel(userId)).xp, 50);
+  assert.equal((await getUserLevel(userId)).xp, 100);
   assert.equal((await economy.getBalance(userId)).coins, 200);
 });
 

@@ -14,8 +14,23 @@ for (const boundary of ['reservation', 'coins', 'xp', 'stats']) {
       await run(process.execPath, [fixture, boundary], options);
       for (let i = 0; i < 2; i++) {
         const { stdout } = await run(process.execPath, [fixture, 'recover'], options);
-        assert.deepEqual(JSON.parse(stdout), { status: 'completed', winnerId: '222', winnerWins: 1, winnerGames: 1, loserWins: 0, loserGames: 1, coins: 200, xp: 50 });
+        assert.deepEqual(JSON.parse(stdout), { status: 'completed', winnerId: '222', winnerWins: 1, winnerGames: 1, loserWins: 0, loserGames: 1, coins: 200, xp: 100 });
       }
     } finally { await fs.rm(dir, { recursive: true, force: true }); }
   });
 }
+
+test('an old-rate game receipt recovers its original XP after rewards increase', async () => {
+  const dir = await fs.mkdtemp('/tmp/colonist-old-rate-');
+  const options = { env: { ...process.env, DATA_DIR: dir }, timeout: 10000 };
+  try {
+    await run(process.execPath, [fixture, 'coins', 'old-rates'], options);
+    for (let i = 0; i < 2; i++) {
+      const { stdout } = await run(process.execPath, [fixture, 'recover'], options);
+      const result = JSON.parse(stdout);
+      assert.equal(result.xp, 50);
+      assert.equal(result.winnerWins, 1);
+      assert.equal(result.loserGames, 1);
+    }
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});

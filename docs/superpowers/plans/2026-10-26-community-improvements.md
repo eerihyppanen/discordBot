@@ -66,3 +66,12 @@ Implementation decisions follow the design; the user's instruction reserves appr
 - Fresh independent reviewer ran 29 focused tests and found no Critical, Important or Minor issues. Queue admission limits and multiple-process coordination remain outside this single-process bot's scope; historical rows without source metadata retain their documented behavior.
 - [ ] User merge approval: request after publishing the tested branch. Main remains at the original base until approval.
 
+## Follow-up: more XP
+
+The user requested another increase for messages and wins while asking which actions currently award XP. The review branch now awards 30 XP per eligible message, 100 XP per Colonist win and +50 XP per complete three-win streak step. Cooldowns, coins, existing XP and level thresholds are unchanged.
+
+- Updated reward assertions failed at the previous rates, then passed with the new constants.
+- Full suite: 156 tests passed, including both game-session and moderator receipt recovery across the old/new reward rates, cooldowns, streak steps and duplicate protection.
+- Build and compiled-runtime XP smoke passed. No XP is granted for losses; coins retain their existing amounts.
+- Changes remain on the feature branch awaiting explicit merge permission.
+

@@ -4,7 +4,7 @@ The user requested all five remaining recommendations, a small XP increase, test
 
 ## Design
 
-- Message rewards increase from 15 to 20 XP (+33%). The 60-second cooldown, existing XP, level thresholds and Colonist rewards stay intact.
+- Message rewards increase from 15 to 30 XP. The follow-up request increases Colonist wins from 50 to 100 XP and each three-win streak step from +25 to +50 XP. The 60-second message cooldown, 30-minute win-reward cooldown, existing XP, level thresholds and coin rewards stay intact. Interrupted awards retain their originally recorded reward amounts across upgrades.
 - `/balance` displays the usable wallet balance. Retain stored legacy bank values without modifying balances.
 - Welcome messages skip absent/non-message channels, await delivery, and log delivery failures. Prefer optional `CHANNEL_ID`, with `CHANNEL_NAME` as the existing fallback. Remove unused meme helpers/settings.
 - Cache successful PUBG player responses for two minutes and match participant stats for fifteen minutes, with bounded cache size, duplicate-request coalescing, and at most three simultaneous HTTP requests per client. Failed and missing responses are retried. Summaries analyze at most twenty matches and update saved rankings only when every requested match was successfully analyzed. Partial results explicitly preserve the existing ranking.

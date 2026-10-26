@@ -16,9 +16,9 @@ const matchKey = (id) => {
 };
 
 export const REWARDS = {
-  WIN_XP: 50,           // XP per win
+  WIN_XP: 100,          // XP per win
   WIN_COINS: 100,       // Coins per win
-  STREAK_BONUS_XP: 25,  // Extra XP per streak multiplier
+  STREAK_BONUS_XP: 50,  // Extra XP per streak multiplier
   STREAK_BONUS_COINS: 50 // Extra coins per streak multiplier
 };
 

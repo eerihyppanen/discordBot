@@ -31,7 +31,7 @@ test('one game durably records one winner, every loser and rewards exactly once 
     assert.equal(saved[id].currentStreak, 0);
   }
   assert.equal((await economy.getBalance('101')).coins, 200);
-  assert.equal((await getUserLevel('101')).xp, 50);
+  assert.equal((await getUserLevel('101')).xp, 100);
   await assert.rejects(record({ ...value, winnerId: '102' }), /already|different winner/i);
   await assert.rejects(record({ ...value, guildId: 'other' }), /already|different/i);
 });
@@ -45,11 +45,11 @@ test('reward cooldown never discards games or postpones the next eligible reward
   assert.equal((await colonist.getPlayerStats('201')).wins, 2);
   assert.equal((await colonist.getPlayerStats('202')).totalGames, 2);
   assert.equal((await economy.getBalance('201')).coins, 200);
-  assert.equal((await getUserLevel('201')).xp, 50);
+  assert.equal((await getUserLevel('201')).xp, 100);
   const eligible = await record({ ...value, id: 'cooldown-game-three', finishedAt: value.finishedAt + 30 * 60_000 });
   assert.equal(eligible.rewarded, true);
   assert.equal((await economy.getBalance('201')).coins, 350);
-  assert.equal((await getUserLevel('201')).xp, 125);
+  assert.equal((await getUserLevel('201')).xp, 250);
   assert.equal((await colonist.getPlayerStats('201')).wins, 3);
 });
 
@@ -68,7 +68,7 @@ test('an interrupted XP save protects all participants and retries without dupli
   failure.mock.restore();
   await record(value);
   assert.equal((await economy.getBalance('301')).coins, 200);
-  assert.equal((await getUserLevel('301')).xp, 50);
+  assert.equal((await getUserLevel('301')).xp, 100);
   assert.equal((await colonist.getPlayerStats('302')).totalGames, 1);
 });
 
@@ -105,4 +105,14 @@ test('skipped session rewards do not delay the next eligible legacy confirmation
   await colonist.recordWinWithRewards('801', 'Player 1', { matchId: 'legacy-shared-next', confirmedBy: 'moderator', guildId: 'guild', now: value.finishedAt + 31 * 60_000 });
   assert.equal((await economy.getBalance('801')).coins, 350);
   assert.equal((await colonist.getPlayerStats('801')).wins, 3);
+});
+
+test('win XP increases at each three-win streak step while coins keep their existing amounts', async () => {
+  const value = game('streak-one', '90');
+  for (let streak = 1; streak <= 6; streak++) {
+    const result = await record({ ...value, id: `streak-${streak}`, finishedAt: value.finishedAt + streak * 30 * 60_000 });
+    assert.equal(result.xpReward, streak < 3 ? 100 : streak < 6 ? 150 : 200);
+    assert.equal(result.coinReward, streak < 3 ? 100 : streak < 6 ? 150 : 200);
+  }
+  assert.equal((await getUserLevel('901')).xp, 850);
 });

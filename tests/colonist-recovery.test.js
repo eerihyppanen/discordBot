@@ -15,8 +15,20 @@ for (const crashAfter of ['coins', 'xp']) {
       await run(process.execPath, [fixture, crashAfter], options);
       for (let i = 0; i < 2; i++) {
         const { stdout } = await run(process.execPath, [fixture, 'recover'], options);
-        assert.deepEqual(JSON.parse(stdout), { alreadyRecorded: true, coins: 200, xp: 50, wins: 1, totalGames: 2 });
+        assert.deepEqual(JSON.parse(stdout), { alreadyRecorded: true, coins: 200, xp: 100, wins: 1, totalGames: 2 });
       }
     } finally { await fs.rm(directory, { recursive: true, force: true }); }
   });
 }
+
+test('an old-rate moderator receipt recovers its original XP after rewards increase', async () => {
+  const directory = await fs.mkdtemp('/tmp/colonist-old-rate-');
+  const options = { env: { ...process.env, DATA_DIR: directory }, timeout: 10000 };
+  try {
+    await run(process.execPath, [fixture, 'coins', 'old-rates'], options);
+    for (let i = 0; i < 2; i++) {
+      const { stdout } = await run(process.execPath, [fixture, 'recover'], options);
+      assert.deepEqual(JSON.parse(stdout), { alreadyRecorded: true, coins: 200, xp: 50, wins: 1, totalGames: 2 });
+    }
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});

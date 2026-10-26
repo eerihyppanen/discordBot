@@ -126,12 +126,19 @@ sending but before recording completion can cause a duplicate delivery.
 
 ## Rewards and levels
 
-Eligible server messages earn 20 XP at most once per user per 60 seconds, shared
+Eligible server messages earn 30 XP at most once per user per 60 seconds, shared
 across channels and servers. Bots, webhooks and DMs do not earn XP. Rewards can
 cross multiple level thresholds. Eligible messages and confirmed Colonist wins
 synchronize the member's level role; a later message can retry a missed update.
-Existing XP and level thresholds are preserved. Level 2 requires 400 XP: twenty
-eligible messages instead of twenty-seven. Colonist reward amounts are unchanged.
+Existing XP and level thresholds are preserved. Level 2 requires 400 XP: fourteen
+eligible messages instead of twenty-seven at the original 15 XP rate.
+Recorded Colonist wins award 100 XP, plus 50 XP for each complete three-win streak
+step: 100 XP at streaks 1–2, 150 at 3–5, 200 at 6–8, and so on. Losses reset the
+streak. The existing win-reward cooldown and coin amounts are unchanged.
+Messages and Colonist wins are the only current XP sources. Daily rewards and
+gambling affect coins; PUBG/FACEIT lookups, skins, profiles, losses, and voice chat
+do not award XP. Previously recorded XP is not recalculated, and interrupted saves
+retain their original reward amounts when recovered after an upgrade.
 `/balance` shows usable wallet coins; stored legacy bank values are retained.
 
 ### Colonist games with friends

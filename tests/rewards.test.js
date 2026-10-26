@@ -30,20 +30,20 @@ test('existing under-levelled data displays its correct level without writing on
 test('message XP cooldown is atomic across concurrent messages and allows the next minute', async () => {
   const results = await Promise.all(Array.from({ length: 20 }, () => addMessageXP('chat-user', 1_000_000)));
   assert.equal(results.filter(r => r.awarded).length, 1);
-  assert.equal((await getUserLevel('chat-user')).xp, 20);
+  assert.equal((await getUserLevel('chat-user')).xp, 30);
   assert.equal((await addMessageXP('chat-user', 1_059_999)).awarded, false);
-  assert.equal((await addMessageXP('chat-user', 1_060_000)).xp, 40);
+  assert.equal((await addMessageXP('chat-user', 1_060_000)).xp, 60);
   await flushLevelingData();
   const saved = JSON.parse(await fs.readFile(`${directory}/userLevels.json`, 'utf8'));
   assert.equal(saved['chat-user'].lastMessageXPAt, 1_060_000);
 });
 
-test('twenty eligible messages reach level two without changing existing thresholds', async () => {
-  for (let minute = 0; minute < 19; minute++) await addMessageXP('easier-levels', minute * 60_000);
-  assert.equal((await getUserLevel('easier-levels')).xp, 380);
+test('fourteen eligible messages reach level two without changing existing thresholds', async () => {
+  for (let minute = 0; minute < 13; minute++) await addMessageXP('easier-levels', minute * 60_000);
+  assert.equal((await getUserLevel('easier-levels')).xp, 390);
   assert.equal((await getUserLevel('easier-levels')).level, 1);
-  const reached = await addMessageXP('easier-levels', 19 * 60_000);
-  assert.equal(reached.xp, 400);
+  const reached = await addMessageXP('easier-levels', 13 * 60_000);
+  assert.equal(reached.xp, 420);
   assert.equal(reached.level, 2);
   assert.equal(reached.leveledUp, true);
 });
@@ -70,7 +70,7 @@ test('confirmed match IDs deduplicate concurrent calls, other winners and other 
   const results = await Promise.all(Array.from({ length: 8 }, () => recordWinWithRewards('winner', 'Winner', approval('unique-match'))));
   assert.equal(results.filter(r => !r.alreadyRecorded).length, 1);
   assert.equal((await economy.getBalance('winner')).coins, 200);
-  assert.equal((await getUserLevel('winner')).xp, 50);
+  assert.equal((await getUserLevel('winner')).xp, 100);
   assert.equal((await getPlayerStats('winner')).wins, 1);
   await assert.rejects(recordWinWithRewards('other-winner', 'Other', approval('UNIQUE-MATCH')), /already.*recorded/);
   await assert.rejects(recordWinWithRewards('winner', 'Winner', { ...approval('unique-match'), guildId: 'another-guild' }), /already.*recorded/);
@@ -96,7 +96,7 @@ test('a failed XP save blocks later results until the original award finishes, w
   failure.mock.restore();
   const result = await recordWinWithRewards('pending', 'Pending', approval('pending-match'));
   assert.equal(result.newBalance, 200);
-  assert.equal((await getUserLevel('pending')).xp, 50);
+  assert.equal((await getUserLevel('pending')).xp, 100);
   assert.equal((await getPlayerStats('pending')).wins, 1);
 });
 

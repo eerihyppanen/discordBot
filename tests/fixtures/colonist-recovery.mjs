@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 const { economy } = await import('../../src/utils/economySystem.js');
-const { recordWinWithRewards, initializeColonistData, getPlayerStats, addLoss } = await import('../../src/utils/colonistSystem.js');
+const { recordWinWithRewards, initializeColonistData, getPlayerStats, addLoss, REWARDS } = await import('../../src/utils/colonistSystem.js');
 const { getUserLevel } = await import('../../src/utils/levelingSystem.js');
+if (process.argv[3] === 'old-rates') { REWARDS.WIN_XP = 50; REWARDS.STREAK_BONUS_XP = 25; }
 const approval = { matchId: 'recovery-match', confirmedBy: 'moderator', guildId: 'guild' };
 
 if (['coins', 'xp'].includes(process.argv[2])) await addLoss('winner', 'Winner');

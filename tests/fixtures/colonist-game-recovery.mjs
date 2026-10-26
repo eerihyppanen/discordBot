@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 const { colonistGames } = await import('../../src/utils/colonistGameSystem.js');
-const { initializeColonistData, getPlayerStats, flushColonistData } = await import('../../src/utils/colonistSystem.js');
+const { initializeColonistData, getPlayerStats, flushColonistData, REWARDS } = await import('../../src/utils/colonistSystem.js');
+if (process.argv[3] === 'old-rates') { REWARDS.WIN_XP = 50; REWARDS.STREAK_BONUS_XP = 25; }
 const { economy } = await import('../../src/utils/economySystem.js');
 const { getUserLevel, flushLevelingData } = await import('../../src/utils/levelingSystem.js');
 const context = { guildId: 'guild', channelId: 'channel' };
