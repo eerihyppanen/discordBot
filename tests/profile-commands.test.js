@@ -26,7 +26,7 @@ const content = output => typeof output.reply === 'string' ? output.reply : outp
 
 test('/profile manages only the caller’s names and saves them before acknowledging', async () => {
   const { default: command } = await import('../src/commands/profile.js');
-  assert.deepEqual(command.data.toJSON().options.map(option => option.name), ['set', 'show', 'clear']);
+  assert.deepEqual(command.data.toJSON().options.map(option => option.name), ['set', 'show', 'clear', 'card', 'shop', 'buy', 'inventory', 'equip', 'unequip']);
   const set = request('set', { pubg: 'MyPUBG', faceit: 'MyFACEIT' });
   set.interaction.editReply = async payload => {
     assert.equal(JSON.parse(await fs.readFile(`${dir}/playerProfiles.json`, 'utf8'))['101'].pubg, 'MyPUBG');

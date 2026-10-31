@@ -67,6 +67,7 @@ current subcommands, required and optional parameters, and available choices.
 | Moderator tools | `/admin pubg-stats username wins matches`, `/admin colonist-cancel player`, `/admin status` (Manage Server required) |
 | Other games | `/faceit [username]`, `/colonist game`, `/colonist win`, `/colonist stats`, `/colonist-leaderboard` |
 | Saved game usernames | `/profile set [pubg] [faceit]`, `/profile show`, `/profile clear game` |
+| Cosmetic profiles | `/profile shop`, `/profile buy item`, `/profile inventory`, `/profile equip item`, `/profile unequip type`, `/profile card [user]` |
 | Legendary skins | `/lege add`, `/lege undo`, `/lege count`, `/lege list`, `/lege leaderboard` |
 | XP | `/level`, `/leaderboard` |
 | Virtual economy | `/balance`, `/daily`, `/gamble coinflip`, `/gamble slots`, `/gamble dice` |
@@ -97,6 +98,29 @@ argument. An explicit username looks up someone else without changing your profi
 `/profile show` displays your preferences privately. `/profile clear game:pubg`,
 `game:faceit`, or `game:all` removes them. Profiles save only the caller's settings,
 survive restarts, and are a convenience rather than verified game-account ownership.
+
+### Cosmetic coin purchases
+
+`/profile shop` lists permanent cosmetic titles and badges with their coin prices.
+Select an item with `/profile buy`, then wear it with `/profile equip`.
+`/profile inventory` shows owned items; `/profile unequip type:title`, `type:badge`
+or `type:all` removes the current selection without losing ownership. You can equip
+one title and one badge at a time. Repeating a purchase never charges twice.
+
+| Item | Type | Coins |
+| --- | --- | ---: |
+| The Regular | Title | 500 |
+| Master Tactician | Title | 1,000 |
+| Community Legend | Title | 2,500 |
+| 🎲 Dice Enthusiast | Badge | 300 |
+| 🍗 Chicken Dinner | Badge | 750 |
+| 👑 Golden Crown | Badge | 1,500 |
+
+Shop actions and inventory are private. `/profile card [user]` displays a public
+card containing only the selected cosmetics and Discord identity. Saved PUBG/FACEIT
+names stay private; clearing saved names does not remove purchases. Coins and item
+ownership save together in `economy.json` before confirming a purchase. Cosmetics
+do not change level titles, Discord roles, permissions, XP or coin rewards.
 
 ### Welcome messages
 
@@ -137,13 +161,13 @@ sending but before recording completion can cause a duplicate delivery.
 
 ## Rewards and levels
 
-Eligible server messages earn 30 XP at most once per user per 60 seconds, shared
+By default, eligible server messages earn 30 XP at most once per user per 60 seconds, shared
 across channels and servers. Bots, webhooks and DMs do not earn XP. Rewards can
 cross multiple level thresholds. Eligible messages and confirmed Colonist wins
 synchronize the member's level role; a later message can retry a missed update.
 Existing XP and level thresholds are preserved. Level 2 requires 400 XP: fourteen
 eligible messages instead of twenty-seven at the original 15 XP rate.
-Recorded Colonist wins award 100 XP, plus 50 XP for each complete three-win streak
+By default, recorded Colonist wins award 100 XP, plus 50 XP for each complete three-win streak
 step: 100 XP at streaks 1–2, 150 at 3–5, 200 at 6–8, and so on. Losses reset the
 streak. The existing win-reward cooldown and coin amounts are unchanged.
 Messages and Colonist wins are the only current XP sources. Daily rewards and
@@ -151,6 +175,28 @@ gambling affect coins; PUBG/FACEIT lookups, skins, profiles, losses, and voice c
 do not award XP. Previously recorded XP is not recalculated, and interrupted saves
 retain their original reward amounts when recovered after an upgrade.
 `/balance` shows usable wallet coins; stored legacy bank values are retained.
+
+### Configuring XP rewards
+
+One validated settings module controls rewards and cooldowns. Set environment
+variables and restart the bot; no JavaScript edits are needed. `/level` displays
+the active values alongside level progress.
+
+| Variable | Default | Allowed values |
+| --- | ---: | --- |
+| `MESSAGE_XP` | 30 | Whole number, 0–10,000 |
+| `MESSAGE_XP_COOLDOWN_SECONDS` | 60 | Whole number, 1–86,400 seconds |
+| `COLONIST_WIN_XP` | 100 | Whole number, 0–1,000,000 |
+| `COLONIST_STREAK_BONUS_XP` | 50 | Whole number, 0–1,000,000 |
+| `COLONIST_REWARD_COOLDOWN_MINUTES` | 30 | Whole number, 1–10,080 minutes |
+
+Zero XP disables that XP award; cooldowns must stay positive. Blank/unset values
+use the defaults. Invalid values stop startup and identify the setting without
+echoing its value. The Colonist reward cooldown applies to both XP and coins;
+coin amounts and level thresholds stay unchanged. Old interrupted reward receipts
+retain their original amounts when recovered after configuration changes.
+`npm start` and `npm run dev` load `.env`; production must inject these variables
+or use the existing environment-file setup.
 
 ### Colonist games with friends
 
@@ -169,7 +215,7 @@ on start, and a result being saved cannot be cancelled or assigned to a second w
 Each player can participate in one unfinished game at a time.
 
 Every game counts in the statistics. XP/coins are awarded at most once per winner
-per 30 minutes; a game played sooner still updates wins, losses and streaks, and
+per configured cooldown (30 minutes by default); a game played sooner still updates wins, losses and streaks, and
 does not postpone the next reward. Level roles synchronize after a saved win.
 
 Sessions and rosters persist across restarts in `colonistGames.json`. Reopen your
@@ -220,6 +266,19 @@ Both `SIGINT` and `SIGTERM` stop new work, flush stores, drain active interactio
 and reminder delivery, flush again, then disconnect. The shutdown deadline is eight
 seconds. Failed saves or timeouts exit with failure. Hard kills or power failures
 can lose batched statistics that have not yet been flushed.
+
+Fatal uncaught exceptions and unhandled rejections also stop new work, attempt a
+bounded save and disconnect, then exit with failure. A fatal error during normal
+shutdown escalates its exit code. Restarts are handled by your process supervisor;
+running Node directly does not automatically launch a replacement process.
+The deprecated `ready` listener has been removed; startup uses `clientReady`.
+
+An example Pi service is in `deploy/discord-bot.service.example`. Adjust its user,
+project path and Node 24 executable, and configure your existing supervisor with
+`Restart=on-failure` and a stop timeout greater than the bot's eight-second deadline.
+For Docker, use a restart policy such as `--restart unless-stopped`. Run one bot
+instance per data directory. Installing/restarting a Pi service is a separate
+operation from building and testing this repository.
 
 Two compatibility details for older installations:
 

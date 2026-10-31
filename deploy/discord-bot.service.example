@@ -1,0 +1,20 @@
+[Unit]
+Description=Discord community bot
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+# Adjust the user, project path and Node 24 executable for your Pi.
+User=pi
+WorkingDirectory=/home/pi/discordBot
+Environment=NODE_ENV=production
+EnvironmentFile=/home/pi/discordBot/.env
+ExecStart=/usr/bin/node /home/pi/discordBot/build/app.js
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=12
+
+[Install]
+WantedBy=multi-user.target

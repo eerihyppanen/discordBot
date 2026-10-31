@@ -4,6 +4,27 @@ import { createLifecycle } from '../src/utils/lifecycle.js';
 
 const logger = { log() {}, error() {} };
 
+test('a fatal shutdown flushes stores and exits with failure even when saving succeeds', async () => {
+  const order = [];
+  const lifecycle = createLifecycle({
+    client: { destroy: async () => order.push('disconnect') },
+    flushers: [async () => order.push('save')], exit: code => order.push('exit:' + code), logger,
+  });
+  await lifecycle.shutdown('uncaughtException', { fatal: true });
+  assert.deepEqual(order, ['save', 'save', 'disconnect', 'exit:1']);
+});
+
+test('a fatal error during normal shutdown escalates the same shutdown to failure', async () => {
+  let release, exitCode;
+  const gate = new Promise(resolve => { release = resolve; });
+  const lifecycle = createLifecycle({ client: { destroy: async () => {} }, flushers: [() => gate], exit: code => { exitCode = code; }, logger });
+  const closing = lifecycle.shutdown('SIGTERM');
+  assert.equal(lifecycle.shutdown('unhandledRejection', { fatal: true }), closing);
+  release();
+  await closing;
+  assert.equal(exitCode, 1);
+});
+
 test('shutdown drains work, flushes every store, and disconnects before exit', async () => {
   const order = [];
   let finish;

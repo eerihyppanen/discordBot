@@ -9,6 +9,7 @@ export const createLifecycle = ({
   const active = new Set();
   let stopping = false;
   let shutdownPromise;
+  let fatalRequested = false;
 
   const run = (task) => {
     if (stopping) return Promise.resolve();
@@ -18,7 +19,8 @@ export const createLifecycle = ({
     return result;
   };
 
-  const shutdown = (signal) => {
+  const shutdown = (signal, { fatal = false } = {}) => {
+    fatalRequested ||= fatal;
     if (shutdownPromise) return shutdownPromise;
     stopping = true;
     shutdownPromise = (async () => {
@@ -27,7 +29,6 @@ export const createLifecycle = ({
         logger.error('Shutdown timed out before all work could finish.');
         exit(1);
       }, timeoutMs);
-      deadline.unref?.();
       const errors = [];
       const saveAll = async () => {
         const results = await Promise.allSettled(flushers.map((flush) => Promise.resolve().then(flush)));
@@ -47,7 +48,7 @@ export const createLifecycle = ({
       }
       if (errors.length) logger.error('Shutdown failed:', new AggregateError(errors));
       clearTimeout(deadline);
-      exit(errors.length ? 1 : 0);
+      exit(errors.length || fatalRequested ? 1 : 0);
     })();
     return shutdownPromise;
   };

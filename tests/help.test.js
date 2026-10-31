@@ -47,6 +47,8 @@ test('detailed help uses current required inputs, optional inputs, choices and s
   assert.match(leaderboard, /wins/);
   assert.match(leaderboard, /streaks/);
   assert.match(JSON.stringify(await show('profile')), /\/profile set \[pubg\] \[faceit\]/);
+  assert.match(JSON.stringify(await show('profile')), /\/profile buy <item>/);
+  assert.match(JSON.stringify(await show('profile')), /\/profile card \[user\]/);
   assert.match(JSON.stringify(await show('pubg')), /manual/);
 });
 

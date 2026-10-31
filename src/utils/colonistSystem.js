@@ -1,10 +1,11 @@
 import { createJsonStore, dataFile } from './jsonStore.js';
 import { addXP, getUserLevel, flushLevelingData } from './levelingSystem.js';
 import { economy } from './economySystem.js';
+import { rewardSettings, formatRewardCooldown } from './rewardSettings.js';
 
 const store = createJsonStore(dataFile('colonistWins.json'), { saveDelayMs: 5 * 60 * 1000 });
 export const flushColonistData = store.flush;
-export const WIN_COOLDOWN_MS = 30 * 60 * 1000;
+export const WIN_COOLDOWN_MS = rewardSettings.colonistRewardCooldownMs;
 
 export class ColonistError extends Error {}
 
@@ -16,9 +17,9 @@ const matchKey = (id) => {
 };
 
 export const REWARDS = {
-  WIN_XP: 100,          // XP per win
+  WIN_XP: rewardSettings.colonistWinXP,
   WIN_COINS: 100,       // Coins per win
-  STREAK_BONUS_XP: 50,  // Extra XP per streak multiplier
+  STREAK_BONUS_XP: rewardSettings.colonistStreakBonusXP,
   STREAK_BONUS_COINS: 50 // Extra coins per streak multiplier
 };
 
@@ -71,7 +72,7 @@ export const recordWinWithRewards = async (userId, username, { matchId, confirme
     }
     const lastWin = Date.parse(players[userId]?.lastRewardAt ?? players[userId]?.lastWinDate ?? '');
     if (!previous && Number.isFinite(lastWin) && now - lastWin < WIN_COOLDOWN_MS) {
-      throw new ColonistError('This player can receive one confirmed win every 30 minutes.');
+      throw new ColonistError(`This player can receive one confirmed win every ${formatRewardCooldown(WIN_COOLDOWN_MS)}.`);
     }
     // The durable coin receipt is also a recovery record for the other two files.
     const result = stageWin(players, userId, username, previous?.at ?? now);

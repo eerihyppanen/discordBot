@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { getUserLevel, getRoleForLevel, getXPForLevel } from "../utils/levelingSystem.js";
+import { rewardSettings, formatRewardCooldown } from '../utils/rewardSettings.js';
 
 const command = {
   data: new SlashCommandBuilder()
@@ -29,7 +30,9 @@ const command = {
         { name: 'Level', value: `${userProgress.level}`, inline: true },
         { name: 'Title', value: roleName, inline: true },
         { name: 'Total XP', value: `${userProgress.xp}`, inline: true },
-        { name: 'Progress to Next Level', value: progressBar, inline: false }
+        { name: 'Progress to Next Level', value: progressBar, inline: false },
+        { name: 'Message XP', value: `${rewardSettings.messageXP} XP per eligible server message, at most once every ${formatRewardCooldown(rewardSettings.messageCooldownMs)}.` },
+        { name: 'Colonist XP', value: `${rewardSettings.colonistWinXP} XP per win, plus ${rewardSettings.colonistStreakBonusXP} XP for each three-win streak step. Rewards at most once every ${formatRewardCooldown(rewardSettings.colonistRewardCooldownMs)}. Losses reset the streak; every game still counts.` }
       )
       .setTimestamp();
     

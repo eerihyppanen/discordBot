@@ -13,6 +13,7 @@ import { colonistGames } from './utils/colonistGameSystem.js';
 import { createLifecycle } from './utils/lifecycle.js';
 import { dispatchInteraction } from './utils/interactionHandler.js';
 import { profiles } from './utils/profileSystem.js';
+import { installProcessHandlers } from './utils/processHandlers.js';
 
 // Load data before accepting events. Existing JSON files keep their format.
 await initializeData();
@@ -55,6 +56,7 @@ const lifecycle = createLifecycle({
     await reminders.stop();
   },
 });
+installProcessHandlers(lifecycle);
 
 // --- Command Loading ---
 client.commands = new Collection();
@@ -104,22 +106,6 @@ client.on('interactionCreate', interaction => {
     .catch(error => console.error('Failed to respond to interaction:', error));
 });
 
-// Global error handlers
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // Don't exit - keep the bot running
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  // Don't exit - keep the bot running
-});
-
-// Save current state, drain commands and events, then flush again before disconnecting.
-for (const signal of ['SIGINT', 'SIGTERM']) {
-  process.on(signal, () => { void lifecycle.shutdown(signal); });
-}
-
 // Log in to Discord with your client's token
 console.log('🚀 Attempting to login to Discord...');
 if (!process.env.TOKEN) {
@@ -134,7 +120,7 @@ client.login(process.env.TOKEN).catch(error => {
   loginRetry = setTimeout(() => {
     client.login(process.env.TOKEN).catch(retryError => {
       console.error('❌ Retry failed:', retryError);
-      process.exit(1);
+      void lifecycle.shutdown('login failure', { fatal: true });
     });
   }, 5000);
 });

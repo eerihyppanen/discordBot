@@ -1,4 +1,5 @@
 import { createJsonStore, dataFile } from './jsonStore.js';
+import { rewardSettings } from './rewardSettings.js';
 
 const store = createJsonStore(dataFile('userLevels.json'), { saveDelayMs: 5 * 60 * 1000 });
 // Preserve existing level thresholds; a new level-1 user starts at zero XP.
@@ -12,10 +13,10 @@ const progress = user => {
 export const initializeData = store.initialize;
 export const flushLevelingData = store.flush;
 
-export const MESSAGE_XP_COOLDOWN_MS = 60_000;
-export const MESSAGE_XP = 30;
+export const MESSAGE_XP_COOLDOWN_MS = rewardSettings.messageCooldownMs;
+export const MESSAGE_XP = rewardSettings.messageXP;
 
-export const addXP = (userId, xpGained = 15, { beforeCommit, rewardId, messageAt } = {}) => store.update(async (users) => {
+export const addXP = (userId, xpGained = MESSAGE_XP, { beforeCommit, rewardId, messageAt } = {}) => store.update(async (users) => {
   if (!Number.isSafeInteger(xpGained) || xpGained < 0) throw new Error('Invalid XP amount');
   users[userId] ??= { xp: 0, level: 1 };
   const user = users[userId];
