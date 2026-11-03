@@ -39,6 +39,42 @@ const match = { included: [{ type: 'participant', attributes: { stats: {
   timeSurvived: 600, longestKill: 50, walkDistance: 1500,
 } } }] };
 
+const lastMatchWith = async (t, optionalStats) => {
+  const stats = { ...match.included[0].attributes.stats, ...optionalStats };
+  t.mock.method(globalThis, 'fetch', async url => response(url.includes('/players?') ? { data: [player] } : {
+    included: [{ type: 'participant', attributes: { stats } }],
+  }));
+  return run('last');
+};
+
+for (const [label, value] of [
+  ['missing', undefined], ['null', null], ['text', 'unknown'], ['numeric text', '600'],
+  ['true', true], ['false', false], ['negative', -1], ['NaN', NaN], ['infinite', Infinity],
+]) {
+  test(`last-match optional statistics show N/A for ${label} values`, async t => {
+    const reply = await lastMatchWith(t, { timeSurvived: value, longestKill: value, walkDistance: value });
+    for (const name of ['Survival Time', 'Longest Kill', 'Walk Distance']) {
+      assert.equal(reply.fields.find(field => field.name === name).value, 'N/A');
+    }
+    assert.equal(reply.fields.find(field => field.name === 'Kills').value, '3');
+    assert.equal(reply.fields.find(field => field.name === 'Rank').value, '#1');
+  });
+}
+
+test('last-match optional statistics preserve genuine zero values', async t => {
+  const reply = await lastMatchWith(t, { timeSurvived: 0, longestKill: 0, walkDistance: 0 });
+  assert.equal(reply.fields.find(field => field.name === 'Survival Time').value, '0 min');
+  assert.equal(reply.fields.find(field => field.name === 'Longest Kill').value, '0m');
+  assert.equal(reply.fields.find(field => field.name === 'Walk Distance').value, '0m');
+});
+
+test('last-match optional statistics retain their units and rounding for valid numbers', async t => {
+  const reply = await lastMatchWith(t, { timeSurvived: 639, longestKill: 49.6, walkDistance: 1000.4 });
+  assert.equal(reply.fields.find(field => field.name === 'Survival Time').value, '11 min');
+  assert.equal(reply.fields.find(field => field.name === 'Longest Kill').value, '50m');
+  assert.equal(reply.fields.find(field => field.name === 'Walk Distance').value, '1000m');
+});
+
 for (const view of ['last', 'recent']) {
   test(`/pubg stats view:${view} queries only Steam PC and publishes the returned stats`, async t => {
     const definition = pubg.data.toJSON();

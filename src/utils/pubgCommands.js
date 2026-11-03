@@ -4,6 +4,9 @@ import { getTopPlayers, updatePlayerWins, manualPubgStats } from './pubgWinsSyst
 import { truncateText } from './text.js';
 import { profiles } from './profileSystem.js';
 
+const formatMatchMetric = (value, divisor, suffix) => Number.isFinite(value) && value >= 0
+  ? `${Math.round(value / divisor)}${suffix}` : 'N/A';
+
 export const showPubgStats = async interaction => {
   await interaction.deferReply();
   if (!process.env.PUBG_API_KEY || process.env.PUBG_API_KEY === 'your_pubg_api_key_here') {
@@ -25,9 +28,9 @@ export const showPubgStats = async interaction => {
       if (stats) embed.addFields(
         { name: 'Kills', value: `${stats.kills}`, inline: true },
         { name: 'Damage Dealt', value: `${Math.round(stats.damageDealt)}`, inline: true },
-        { name: 'Survival Time', value: `${Math.round(stats.timeSurvived / 60)} min`, inline: true },
-        { name: 'Longest Kill', value: `${Math.round(stats.longestKill)}m`, inline: true },
-        { name: 'Walk Distance', value: `${Math.round(stats.walkDistance)}m`, inline: true },
+        { name: 'Survival Time', value: formatMatchMetric(stats.timeSurvived, 60, ' min'), inline: true },
+        { name: 'Longest Kill', value: formatMatchMetric(stats.longestKill, 1, 'm'), inline: true },
+        { name: 'Walk Distance', value: formatMatchMetric(stats.walkDistance, 1, 'm'), inline: true },
         { name: 'Rank', value: `#${stats.winPlace}`, inline: true },
       );
       else embed.setDescription('No last-match statistics are available.');
