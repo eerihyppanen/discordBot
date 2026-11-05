@@ -2,6 +2,7 @@ import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { MessageFlags } from 'discord.js';
+import { profileRequest, panelComponents } from './fixtures/profile-interactions.mjs';
 
 const dir = await fs.mkdtemp('/tmp/profile-commands-');
 process.env.DATA_DIR = dir;
@@ -24,42 +25,89 @@ const request = (subcommand, strings = {}, id = '101') => {
 };
 const content = output => typeof output.reply === 'string' ? output.reply : output.reply.content;
 
-test('/profile manages only the caller’s names and saves them before acknowledging', async () => {
-  const { default: command } = await import('../src/commands/profile.js');
-  assert.deepEqual(command.data.toJSON().options.map(option => option.name), ['set', 'show', 'clear', 'card', 'shop', 'buy', 'inventory', 'equip', 'unequip']);
-  const set = request('set', { pubg: 'MyPUBG', faceit: 'MyFACEIT' });
-  set.interaction.editReply = async payload => {
+const { default: profileCommand } = await import('../src/commands/profile.js');
+const panel = options => profileRequest(profileCommand, options);
+
+test('settings edit buttons open owner-bound modals and save one name before updating the panel', async () => {
+  const open = panel({ operation: 'settings' });
+  await open.run();
+  assert.equal(open.output.flags, MessageFlags.Ephemeral);
+  assert.ok(panelComponents(open.output.reply).some(item => item.custom_id === 'profile:101:settings:edit:pubg'));
+  const edit = panel({ type: 'button', customId: 'profile:101:settings:edit:pubg' });
+  await edit.run();
+  assert.equal(edit.output.modal.custom_id, 'profile:101:settings:save:pubg');
+  const save = panel({ type: 'modal', customId: edit.output.modal.custom_id, username: 'MyPUBG' });
+  save.r.editReply = async payload => {
     assert.equal(JSON.parse(await fs.readFile(`${dir}/playerProfiles.json`, 'utf8'))['101'].pubg, 'MyPUBG');
-    set.output.reply = payload;
+    save.output.reply = payload;
   };
-  await command.execute(set.interaction);
-  assert.equal(set.output.flags, MessageFlags.Ephemeral);
-  assert.match(content(set.output), /saved/i);
-  const show = request('show');
-  await command.execute(show.interaction);
-  assert.match(JSON.stringify(show.output.reply), /MyPUBG/);
-  const clear = request('clear', { game: 'pubg' });
-  await command.execute(clear.interaction);
+  await save.run();
+  assert.match(save.output.reply.content, /saved/i);
+  await panel({ type: 'modal', customId: 'profile:101:settings:save:faceit', username: 'MyFACEIT' }).run();
+  assert.deepEqual(await profiles.get('101'), { pubg: 'MyPUBG', faceit: 'MyFACEIT' });
+  await panel({ type: 'button', customId: 'profile:101:settings:clear:pubg' }).run();
   assert.deepEqual(await profiles.get('101'), { faceit: 'MyFACEIT' });
-  const other = request('show', {}, '102');
-  await command.execute(other.interaction);
-  assert.doesNotMatch(JSON.stringify(other.output.reply), /MyFACEIT/);
 });
 
-test('/profile rejects an empty update and does not confirm a failed disk write', async () => {
-  const { default: command } = await import('../src/commands/profile.js');
-  const empty = request('set');
-  await command.execute(empty.interaction);
-  assert.match(content(empty.output), /at least one/i);
+test('settings reject forged owners, invalid actions and blank modal values', async () => {
+  for (const options of [
+    { id: '102', type: 'button', customId: 'profile:101:settings:clear:all' },
+    { id: '102', type: 'modal', customId: 'profile:101:settings:save:faceit', username: 'Stolen' },
+    { type: 'button', customId: 'profile:101:settings:edit:unknown' },
+    { type: 'button', customId: 'profile:101:settings:save:pubg' },
+  ]) {
+    const item = panel(options);
+    await item.run();
+    assert.equal(item.output.reply.flags, MessageFlags.Ephemeral);
+    assert.match(item.output.reply.content, /another user|invalid|out of date/i);
+  }
+  const blank = panel({ type: 'modal', customId: 'profile:101:settings:save:faceit', username: ' ' });
+  await blank.run();
+  assert.match(blank.output.reply.content, /username/i);
+  assert.deepEqual(await profiles.get('101'), { faceit: 'MyFACEIT' });
+});
+
+test('failed modal writes do not claim success or change saved settings', async t => {
+  t.mock.method(console, 'error', () => {});
   const file = `${dir}/playerProfiles.json`;
   const saved = await fs.readFile(file);
   await fs.unlink(file);
   await fs.mkdir(file);
-  const set = request('set', { pubg: 'Unsaved' });
+  const save = panel({ type: 'modal', customId: 'profile:101:settings:save:pubg', username: 'Unsaved' });
   try {
-    await assert.rejects(command.execute(set.interaction));
-    assert.equal(set.output.reply, undefined);
+    await save.run();
+    assert.match((save.output.followUp ?? save.output.reply).content, /could not.*save|couldn't.*save/i);
+    assert.deepEqual(await profiles.get('101'), { faceit: 'MyFACEIT' });
   } finally { await fs.rmdir(file); await fs.writeFile(file, saved); }
+});
+
+test('cached removed slash commands redirect safely without applying their old inputs', async () => {
+  const legacy = panel({ operation: 'set' });
+  legacy.r.options.getString = () => 'DoNotSave';
+  await legacy.run();
+  assert.equal(legacy.output.flags, MessageFlags.Ephemeral);
+  assert.match(legacy.output.reply.content, /updated|changed/i);
+  assert.deepEqual(await profiles.get('101'), { faceit: 'MyFACEIT' });
+});
+
+test('clearing all saved names preserves purchased cosmetics and the wallet', async () => {
+  const { economy } = await import('../src/utils/economySystem.js');
+  await profiles.set('301', { pubg: 'PrivateName', faceit: 'PrivateFaceit' });
+  await economy.addCoins('301', 400);
+  await economy.buyCosmetic('301', 'badge-dice');
+  await panel({ id: '301', type: 'button', customId: 'profile:301:settings:clear:all' }).run();
+  assert.deepEqual(await profiles.get('301'), {});
+  assert.deepEqual((await economy.getCosmetics('301')).owned, ['badge-dice']);
+  assert.equal((await economy.getBalance('301')).coins, 200);
+});
+
+test('a modal without a source message opens a private settings reply', async () => {
+  const save = panel({ id: '401', type: 'modal', customId: 'profile:401:settings:save:pubg', username: 'MyNewName' });
+  save.r.isFromMessage = () => false;
+  save.r.message = undefined;
+  await save.run();
+  assert.equal(save.output.flags, MessageFlags.Ephemeral);
+  assert.deepEqual(await profiles.get('401'), { pubg: 'MyNewName' });
 });
 
 test('PUBG and FACEIT use saved usernames when omitted and allow explicit overrides', async t => {
@@ -90,6 +138,6 @@ test('omitting a username without a saved profile gives a useful setup instructi
   for (const [command, subcommand, game] of [[pubg, 'stats', 'pubg'], [faceit, null, 'faceit']]) {
     const item = request(subcommand, {}, '104');
     await command.execute(item.interaction);
-    assert.match(content(item.output), new RegExp('/profile set.*' + game));
+    assert.match(content(item.output), /\/profile settings/);
   }
 });

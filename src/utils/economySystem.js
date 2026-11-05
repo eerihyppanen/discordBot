@@ -54,7 +54,7 @@ export const createEconomySystem = (store) => {
       const item = cosmeticById(itemId);
       return updateUser(userId, user => {
         const inventory = inventoryFor(user);
-        if (!inventory.owned.includes(item.id)) throw new CosmeticError('You must own this cosmetic before equipping it. Use /profile buy.');
+        if (!inventory.owned.includes(item.id)) throw new CosmeticError('You must own this cosmetic before equipping it. Open /profile shop.');
         inventory.equipped[item.type] = item.id;
         return user.cosmetics = inventory;
       });

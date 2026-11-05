@@ -28,7 +28,7 @@ const command = {
     try {
       username ??= (await profiles.get(interaction.user.id)).faceit;
       if (typeof username !== 'string' || !username.trim() || username.trim().length > 50) {
-        return interaction.editReply('❌ Enter a FACEIT username of 1–50 characters or save one with `/profile set faceit:<username>`.');
+        return interaction.editReply('❌ Enter a FACEIT username of 1–50 characters or save one in `/profile settings`.');
       }
       const { player: playerData, profile: cs2Stats, lifetime, game } = await getFaceitStats(username.trim());
       const stat = (key, suffix = '') => lifetime[key] == null

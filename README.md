@@ -66,8 +66,7 @@ current subcommands, required and optional parameters, and available choices.
 | PUBG Steam PC | `/pubg stats [username] [view]`, `/pubg leaderboard [source]` |
 | Moderator tools | `/admin pubg-stats username wins matches`, `/admin colonist-cancel player`, `/admin status` (Manage Server required) |
 | Other games | `/faceit [username]`, `/colonist game`, `/colonist win`, `/colonist stats`, `/colonist-leaderboard` |
-| Saved game usernames | `/profile set [pubg] [faceit]`, `/profile show`, `/profile clear game` |
-| Cosmetic profiles | `/profile shop`, `/profile buy item`, `/profile inventory`, `/profile equip item`, `/profile unequip type`, `/profile card [user]` |
+| Profiles | `/profile card [user]`, `/profile settings`, `/profile shop`, `/profile inventory` |
 | Legendary skins | `/lege add`, `/lege undo`, `/lege count`, `/lege list`, `/lege leaderboard` |
 | XP | `/level`, `/leaderboard` |
 | Virtual economy | `/balance`, `/daily`, `/gamble coinflip`, `/gamble slots`, `/gamble dice` |
@@ -92,20 +91,25 @@ with `/admin pubg-stats` to place them in the separate manual table.
 
 ### Saved usernames
 
-Use `/profile set pubg:YourName faceit:YourName` to save either or both names.
-After that, `/pubg stats` and `/faceit` can use your saved names without a username
+Open `/profile settings` to privately view your saved PUBG and FACEIT usernames.
+**Edit PUBG** and **Edit FACEIT** open a dialog for that game. Clear buttons remove
+one saved name or both. Updating one game preserves the other; preferences save
+before confirmation and survive restarts. They are a convenience, not proof of
+game-account ownership.
+
+After saving a name, `/pubg stats` and `/faceit` can use it without a username
 argument. An explicit username looks up someone else without changing your profile.
-`/profile show` displays your preferences privately. `/profile clear game:pubg`,
-`game:faceit`, or `game:all` removes them. Profiles save only the caller's settings,
-survive restarts, and are a convenience rather than verified game-account ownership.
 
 ### Cosmetic coin purchases
 
-`/profile shop` lists permanent cosmetic titles and badges with their coin prices.
-Select an item with `/profile buy`, then wear it with `/profile equip`.
-`/profile inventory` shows owned items; `/profile unequip type:title`, `type:badge`
-or `type:all` removes the current selection without losing ownership. You can equip
-one title and one badge at a time. Repeating a purchase never charges twice.
+`/profile shop` privately shows your wallet, item prices and purchase buttons.
+Owned items are marked **Owned** and their purchase buttons are disabled. Repeated
+or simultaneous purchase requests still cannot charge twice.
+
+Open `/profile inventory` or press **Open inventory** in the shop. Title and badge
+dropdowns show **only items you own, without prices**. Select an item to equip it;
+removal buttons unequip your title, badge or both without deleting purchases.
+You can equip one title and one badge at a time. **Open shop** returns to shopping.
 
 | Item | Type | Coins |
 | --- | --- | ---: |
@@ -116,11 +120,20 @@ one title and one badge at a time. Repeating a purchase never charges twice.
 | 🍗 Chicken Dinner | Badge | 750 |
 | 👑 Golden Crown | Badge | 1,500 |
 
-Shop actions and inventory are private. `/profile card [user]` displays a public
-card containing only the selected cosmetics and Discord identity. Saved PUBG/FACEIT
-names stay private; clearing saved names does not remove purchases. Coins and item
-ownership save together in `economy.json` before confirming a purchase. Cosmetics
-do not change level titles, Discord roles, permissions, XP or coin rewards.
+`/profile card [user]` is public and contains only selected cosmetics and Discord
+identity. Saved game names remain private. Settings, shop and inventory controls
+belong to the user who opened them; other users cannot operate those controls.
+Controls read current data and work across bot restarts without temporary collectors.
+Changes and panel updates are serialized per message so slower edits cannot replace
+a newer view. If a message refresh fails after a save, reopening the panel shows
+the saved state. Clearing usernames does not affect cosmetics or the wallet.
+
+Coins and ownership save together in `economy.json` before purchase confirmation.
+Cosmetics do not change level titles, Discord roles, permissions, XP or rewards.
+Re-register slash commands after upgrading: the old `set`, `show`, `clear`, `buy`,
+`equip` and `unequip` subcommands have been consolidated into the four profile
+commands above. Cached old commands open the appropriate new panel and do not
+apply their old inputs.
 
 ### Welcome messages
 

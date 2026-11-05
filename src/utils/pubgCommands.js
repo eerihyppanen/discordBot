@@ -15,7 +15,7 @@ export const showPubgStats = async interaction => {
   try {
     const username = interaction.options.getString('username') ?? (await profiles.get(interaction.user.id)).pubg;
     if (typeof username !== 'string' || !username.trim() || username.trim().length > 64) {
-      return interaction.editReply('❌ Enter a PUBG username or save one with `/profile set pubg:<username>`.');
+      return interaction.editReply('❌ Enter a PUBG username or save one in `/profile settings`.');
     }
     const player = await pubgClient.getPlayer(username);
     if (!player) return interaction.editReply('❌ Player not found!');
